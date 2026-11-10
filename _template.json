@@ -1,0 +1,17 @@
+{
+  "chain": "Название сети (как в BRAND_ALIASES, например Rostic's)",
+  "source": "ссылка на страницу с КБЖУ на сайте сети",
+  "updated": "2026-11-10",
+  "items": [
+    {
+      "id": "short-unique-id",
+      "name": "Название позиции как в меню",
+      "serving_name": "1 бургер",
+      "weight_g": null,
+      "kcal": null,
+      "protein": null,
+      "fat": null,
+      "carbs": null
+    }
+  ]
+}
