@@ -26,7 +26,7 @@ RESTAURANTS_DIR = os.path.join(HERE, "restaurants")
 REFRESH_HOURS = float(os.environ.get("FOODS_REFRESH_HOURS", "24"))
 OFF_UA = os.environ.get("OFF_USER_AGENT", "").strip() or "Grammika/1.1 (Telegram Mini App)"
 OFF_SEARCH = "https://world.openfoodfacts.org/cgi/search.pl"
-OFF_FIELDS = "code,product_name,product_name_ru,brands,nutriments,serving_quantity"
+OFF_FIELDS = "code,product_name,product_name_ru,brands,nutriments,serving_quantity,images,image_front_small_url"
 MIN_LOCAL = 8            # меньше стольких своих результатов — спрашиваем Open Food Facts
 OFF_PER_MINUTE = 8       # у Open Food Facts лимит 10 поисков в минуту
 QUERY_TTL_DAYS = 30      # один и тот же запрос в OFF повторно не чаще раза в месяц
@@ -50,6 +50,7 @@ SCHEMA = [
         UNIQUE (source, source_id)
     )""",
     "CREATE INDEX IF NOT EXISTS foods_brand ON foods (brand)",
+    "ALTER TABLE foods ADD COLUMN IF NOT EXISTS image_url TEXT",
     "CREATE INDEX IF NOT EXISTS foods_name_lower ON foods (lower(name))",
     """CREATE TABLE IF NOT EXISTS foods_queries (
         q TEXT PRIMARY KEY,
@@ -102,17 +103,18 @@ def parse_query(q):
 
 UPSERT = """
 INSERT INTO foods (source, source_id, name, brand, kcal, protein, fat, carbs,
-                   serving_g, serving_name, barcode, status, updated_at)
+                   serving_g, serving_name, barcode, image_url, status, updated_at)
 VALUES (%(source)s, %(source_id)s, %(name)s, %(brand)s, %(kcal)s, %(protein)s, %(fat)s,
-        %(carbs)s, %(serving_g)s, %(serving_name)s, %(barcode)s, 'approved', now())
+        %(carbs)s, %(serving_g)s, %(serving_name)s, %(barcode)s, %(image_url)s, 'approved', now())
 ON CONFLICT (source, source_id) DO UPDATE SET
     name = EXCLUDED.name, brand = EXCLUDED.brand, kcal = EXCLUDED.kcal,
     protein = EXCLUDED.protein, fat = EXCLUDED.fat, carbs = EXCLUDED.carbs,
     serving_g = EXCLUDED.serving_g, serving_name = EXCLUDED.serving_name,
-    barcode = EXCLUDED.barcode, status = 'approved', updated_at = now()
+    barcode = EXCLUDED.barcode, image_url = COALESCE(EXCLUDED.image_url, foods.image_url),
+    status = 'approved', updated_at = now()
 """
 _EMPTY = {"brand": None, "protein": None, "fat": None, "carbs": None, "serving_g": None,
-          "serving_name": None, "barcode": None}
+          "serving_name": None, "barcode": None, "image_url": None}
 
 
 def _upsert(cur, foods):
@@ -212,15 +214,41 @@ def _parse_off(p):
         return None
     if not re.search(r"[а-яА-ЯёЁ]", name):  # в приложении на русском — берём русские названия
         return None
+    if len(name) < 3 or JUNK_NAME.search(name):  # служебные пометки вроде «смотка на витрине»
+        return None
+    if None not in pfc and kcal > 40:  # калории сильно расходятся с БЖУ — данные с ошибкой
+        calc = pfc[0] * 4 + pfc[1] * 9 + pfc[2] * 4
+        if abs(calc - kcal) / kcal > 0.35:
+            return None
     brands = p.get("brands") or ""
     if isinstance(brands, list):
         brands = brands[0] if brands else ""
     brand = html.unescape(str(brands).split(",")[0]).strip() or None
+    name = name[:1].upper() + name[1:]
     return {"source": "off", "source_id": code, "barcode": code, "name": name[:100],
             "brand": brand[:80] if brand else None, "kcal": kcal,
-            "protein": _num(n.get("proteins_100g")), "fat": _num(n.get("fat_100g")),
-            "carbs": _num(n.get("carbohydrates_100g")),
-            "serving_g": _num(p.get("serving_quantity"))}
+            "protein": pfc[0], "fat": pfc[1], "carbs": pfc[2],
+            "serving_g": _num(p.get("serving_quantity")), "image_url": off_image(code, p)}
+
+
+JUNK_NAME = re.compile(r"смотк|витрин|паллет|снять|холодильник|\bполк|\d+\s*р\b|на дет\.? питан", re.I)
+
+
+def off_image(code, p):
+    """Ссылка на фото упаковки (200 px). Фото Open Food Facts — лицензия CC BY-SA."""
+    url = p.get("image_front_small_url")
+    if isinstance(url, str) and url.startswith("https://images.openfoodfacts.org/"):
+        return url[:300]
+    images = p.get("images")
+    if not isinstance(images, dict) or not code.isdigit():
+        return None
+    key = next((k for k in ("front_ru", "front_en", "front") if isinstance(images.get(k), dict)), None) \
+        or next((k for k in images if k.startswith("front_") and isinstance(images[k], dict)), None)
+    if not key or not images[key].get("rev"):
+        return None
+    c = code.zfill(13) if len(code) > 8 else code
+    folder = f"{c[0:3]}/{c[3:6]}/{c[6:9]}/{c[9:]}" if len(c) > 8 else c
+    return f"https://images.openfoodfacts.org/images/products/{folder}/{key}.{images[key]['rev']}.200.jpg"
 
 
 def _off_allowed():
@@ -386,7 +414,7 @@ def load_products_pack(pool):
 # ---------------------------------------------------------------- поиск
 
 SEARCH_SQL = """
-SELECT name, brand, kcal, protein, fat, carbs, serving_g, serving_name, source
+SELECT name, brand, kcal, protein, fat, carbs, serving_g, serving_name, source, image_url
 FROM foods
 WHERE status = 'approved'
   AND (%(brand)s::text IS NULL OR brand = %(brand)s)
@@ -407,9 +435,56 @@ def _local(pool, words, brand, limit):
               "start": (words[0] + "%") if words else "%", "lim": limit}
     with pool.connection() as conn:
         rows = conn.execute(SEARCH_SQL, params).fetchall()
-    return [{"name": r[0], "brand": r[1], "cal": r[2], "p": r[3] or 0, "f": r[4] or 0,
-             "c": r[5] or 0, "g": round(r[6]) if r[6] else 100, "portion": r[7], "src": r[8]}
-            for r in rows]
+    items = [{"name": r[0], "brand": r[1], "cal": r[2], "p": r[3] or 0, "f": r[4] or 0,
+              "c": r[5] or 0, "g": round(r[6]) if r[6] else 100, "portion": r[7], "src": r[8],
+              "img": r[9]}
+             for r in rows]
+    return tidy(items)
+
+
+PORTION_TAIL = re.compile(
+    r"\s+(\d+\s*шт\.?|\d+[.,]?\d*\s*л|маленьк\w*|средн\w*|больш\w*|мал(ый|ые|ая)|баскет)$", re.I)
+
+
+def _base_name(name):
+    m = PORTION_TAIL.search(name)
+    return (name[:m.start()].strip(), m.group(1)) if m else (name, None)
+
+
+def _dkey(s):
+    return re.sub(r"[\W_]+", "", _norm(s))
+
+
+def tidy(items):
+    """Склеивает порции одного блюда сети в одну позицию и убирает повторы товаров."""
+    out, groups, seen = [], {}, set()
+    for it in items:
+        if it["src"] == "restaurant":
+            base, tail = _base_name(it["name"])
+            key = ("r", it["brand"], _norm(base))
+            label = it.get("portion") if it.get("portion") and it.get("portion") != "1 порция" else tail
+            portion = {"label": (label or "порция").strip(), "g": it["g"]}
+            g = groups.get(key)
+            if g and abs(g["cal"] - it["cal"]) <= max(8, g["cal"] * 0.1):
+                if all(x["g"] != portion["g"] for x in g["portions"]):
+                    g["portions"].append(portion)
+                continue
+            it = dict(it, name=base if tail else it["name"], portions=[portion])
+            groups[key] = it
+            out.append(it)
+            continue
+        key = (_dkey(it["name"]), _dkey(it.get("brand")))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    for it in out:
+        if it.get("portions"):
+            it["portions"].sort(key=lambda x: x["g"])
+            it["g"] = it["portions"][0]["g"]
+            if len(it["portions"]) == 1 and it["portions"][0]["label"] == "порция":
+                it["portions"] = []
+    return out
 
 
 def search(pool, q="", brand=None, limit=40):
@@ -421,12 +496,12 @@ def search(pool, q="", brand=None, limit=40):
     if not words and not brand:
         return []
     if not words:  # просмотр меню сети целиком
-        return _local(pool, [], brand, 300)
-    items = _local(pool, words, brand, limit)
+        return _local(pool, [], brand, 400)
+    items = _local(pool, words, brand, limit * 3)
     if len(items) < MIN_LOCAL and not brand and len(text) >= 3:
         if _fetch_off_if_needed(pool, text):
-            items = _local(pool, words, brand, limit)
-    return items
+            items = _local(pool, words, brand, limit * 3)
+    return items[:limit]
 
 
 def chains(pool):
@@ -444,6 +519,9 @@ def setup(pool):
     with pool.connection() as conn:
         for stmt in SCHEMA:
             conn.execute(stmt)
+        # убираем из поиска служебный мусор, сохранённый до появления фильтра
+        conn.execute("UPDATE foods SET status = 'archived' WHERE source = 'off' AND status = 'approved' "
+                     "AND name ~* 'смотк|витрин|паллет|снять|холодильник|на дет\\.? питан'")
     if _started:
         return
     _started = True

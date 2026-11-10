@@ -15,6 +15,7 @@ import urllib.request
 import psycopg
 from psycopg_pool import ConnectionPool, PoolTimeout
 
+import extras
 import food_db
 
 APP_VERSION = "1.1"
@@ -637,7 +638,7 @@ WEB_APP_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#F1F4F2">
+<meta name="theme-color" content="#F2F2F7">
 <title>Grammika</title>
 <script>
 (function () {
@@ -652,240 +653,302 @@ WEB_APP_HTML = r"""<!DOCTYPE html>
 })();
 </script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <style>
 :root {
-  --bg: #F1F4F2; --surface: #FFFFFF; --surface-2: #F5F7F6; --line: #E0E6E2;
-  --ink: #17221C; --ink-2: #4B5A52; --ink-3: #7C8B83;
-  --accent: #1F6B4C; --accent-ink: #FFFFFF; --accent-soft: #DCEDE4;
-  --prot: #3F66B5; --fat: #C0821A; --carb: #2E8461; --water: #3B82C4;
-  --danger: #C94646; --danger-soft: #F8E3E3;
-  --s1: #D9A441; --s2: #2E8461; --s3: #4C6FB8; --s4: #A8648A;
-  --overlay: rgba(14, 22, 18, 0.45);
-  --font: 'Manrope', -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --bg: #F2F2F7; --surface: #FFFFFF; --surface-2: #F2F2F7; --line: #E5E5EA;
+  --ink: #1C1C1E; --ink-2: #48484A; --ink-3: #8E8E93;
+  --accent: #19A463; --accent-ink: #FFFFFF; --accent-soft: #E3F5EB;
+  --prot: #FF6B57; --fat: #F5A524; --carb: #4D8BFF; --water: #2FA8E0;
+  --danger: #FF3B30; --danger-soft: #FFE5E3;
+  --s1: #FFAD33; --s2: #2FBF71; --s3: #7B7BFF; --s4: #FF6FA8;
+  --s1-soft: #FFF3E0; --s2-soft: #E2F7EB; --s3-soft: #ECECFF; --s4-soft: #FFE8F1;
+  --ring-track: #ECECF1;
+  --overlay: rgba(0, 0, 0, 0.38);
+  --blur-bg: rgba(249, 249, 251, 0.82);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 :root[data-theme="dark"] {
-  --bg: #0F1512; --surface: #171F1B; --surface-2: #1D2622; --line: #28332E;
-  --ink: #E8EEEA; --ink-2: #A8B6AE; --ink-3: #74847B;
-  --accent: #5CC595; --accent-ink: #0B1A12; --accent-soft: #1E3A2D;
-  --prot: #84A3E6; --fat: #E0A64A; --carb: #5CC595; --water: #6AAEE8;
-  --danger: #EF7676; --danger-soft: #3A2124;
-  --s1: #E0AE50; --s2: #52B88C; --s3: #7F9DE0; --s4: #CC86AE;
-  --overlay: rgba(0, 0, 0, 0.62);
+  --bg: #000000; --surface: #1C1C1E; --surface-2: #2C2C2E; --line: #38383A;
+  --ink: #F2F2F7; --ink-2: #C7C7CC; --ink-3: #8E8E93;
+  --accent: #32D27A; --accent-ink: #052012; --accent-soft: #15301F;
+  --prot: #FF7F6B; --fat: #FFB547; --carb: #6EA2FF; --water: #5AC8FA;
+  --danger: #FF5A50; --danger-soft: #3A1A18;
+  --s1: #FFB547; --s2: #32D27A; --s3: #8E8EFF; --s4: #FF7EB3;
+  --s1-soft: #3A2A10; --s2-soft: #15301F; --s3-soft: #23234A; --s4-soft: #3D1A2A;
+  --ring-track: #2C2C2E;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --blur-bg: rgba(22, 22, 24, 0.82);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 500 15px/1.4 var(--font); font-variant-numeric: tabular-nums; padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.38 var(--font); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 body.noscroll { overflow: hidden; }
-button, input, select, textarea { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
-.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+.num { font-family: var(--round); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
 /* верхняя панель */
-.top { position: sticky; top: 0; z-index: 20; background: var(--bg); }
-.top .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 56px; }
-.streak { justify-self: start; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px 0 9px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); font-weight: 700; font-size: 13px; }
-.streak .i { width: 16px; height: 16px; color: var(--fat); }
-.top-title { font-weight: 800; font-size: 17px; text-align: center; }
-.datenav { display: flex; align-items: center; gap: 2px; }
-.datenav .nav { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 17px; color: var(--ink-2); }
+.top { position: sticky; top: 0; z-index: 20; background: var(--blur-bg); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+.top .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 54px; }
+.streak { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 11px 0 8px; border-radius: 15px; background: var(--surface); font: 600 14px var(--round); }
+.streak .i { width: 17px; height: 17px; color: var(--fat); fill: var(--fat); fill-opacity: .18; }
+.top-title { font-weight: 600; font-size: 17px; text-align: center; }
+.datenav { display: flex; align-items: center; gap: 0; }
+.datenav .nav { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 17px; color: var(--accent); }
 .datenav .nav:active { background: var(--surface); }
-.datelabel { position: relative; display: block; min-width: 118px; text-align: center; font-weight: 800; font-size: 16px; padding: 6px 4px; border-radius: 10px; }
+.datelabel { position: relative; display: block; min-width: 112px; text-align: center; font-weight: 600; font-size: 17px; padding: 6px 4px; border-radius: 10px; }
 .datelabel input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
-.avatar { justify-self: end; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 800; font-size: 14px; border: 1px solid var(--line); }
-.avatar { position: relative; }
+.avatar { justify-self: end; position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
 .avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* общие блоки */
 .tab { display: none; padding-top: 4px; }
 .tab.active { display: block; }
-.h2 { margin: 22px 2px 8px; font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.h2 small { font-size: 13px; font-weight: 600; color: var(--ink-3); }
-.group { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.pad { padding: 14px; }
-.row { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 10px 14px; width: 100%; text-align: left; }
-.group > .row + .row, .group > * + .row, .group > .row + * { border-top: 1px solid var(--line); }
-button.row:active, a.row:active { background: var(--surface-2); }
+.h2 { margin: 26px 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.h2 small { font-size: 14px; font-weight: 400; color: var(--ink-3); letter-spacing: 0; }
+.group { background: var(--surface); border-radius: 18px; overflow: hidden; }
+.pad { padding: 16px; }
+.row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; width: 100%; text-align: left; }
+.group > .row + .row::before, .group > * + .row::before, .group > .row + *::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--line); }
+.group > .row + * { position: relative; }
+.group > .row.thumbed + .row.thumbed::before { left: 72px; }
+button.row:active, a.row:active, label.row:active { background: var(--surface-2); }
 .grow { flex: 1; min-width: 0; }
-.ttl { font-weight: 700; }
-.sub { font-size: 12.5px; color: var(--ink-3); font-weight: 500; }
-.sub.i2 { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 1px; }
+.ttl { font-weight: 600; font-size: 16px; line-height: 1.3; }
+.sub { font-size: 13px; color: var(--ink-3); font-weight: 400; line-height: 1.35; }
+.sub.i2 { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
 .mut { color: var(--ink-3); }
 .ok { color: var(--accent); }
 .bad { color: var(--danger); }
-.end { margin-left: auto; font-weight: 700; white-space: nowrap; }
-.chev { color: var(--ink-3); width: 18px; height: 18px; }
-.ico-box { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
-.empty { padding: 18px 14px; color: var(--ink-2); font-size: 14px; }
+.end { margin-left: auto; font-weight: 600; white-space: nowrap; font-family: var(--round); }
+.chev { color: var(--ink-3); width: 17px; height: 17px; opacity: .6; }
+.ico-box { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--accent); color: #fff; flex: none; }
+.ico-box .i { width: 18px; height: 18px; }
+.empty { padding: 20px 16px; color: var(--ink-2); font-size: 15px; }
 .empty b { color: var(--ink); }
 
+/* превью продукта: фото, упаковка или эмодзи */
+.thumb { width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center; font-size: 24px; line-height: 1; background: var(--surface-2); overflow: hidden; position: relative; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb.pack img { object-fit: contain; background: #fff; padding: 3px; }
+.thumb .cam { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; border-radius: 4px; background: rgba(0,0,0,.45); color: #fff; display: grid; place-items: center; }
+.thumb .cam .i { width: 10px; height: 10px; stroke-width: 2.4; }
+
 /* кнопки и поля */
-.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px; padding: 0 16px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 15px; transition: transform .12s ease, opacity .12s ease; }
-.btn:active { transform: scale(.98); opacity: .9; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 50px; padding: 0 18px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 17px; transition: transform .12s ease, opacity .12s ease; }
+.btn:active { transform: scale(.98); opacity: .85; }
 .btn[disabled] { opacity: .45; }
-.btn.sec { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.btn.sec { background: var(--surface-2); color: var(--ink); }
+.sheet .btn.sec, .group .btn.sec { background: var(--surface-2); }
 .btn.soft { background: var(--accent-soft); color: var(--accent); }
 .btn.dng { background: var(--danger-soft); color: var(--danger); }
-.btn.sm { height: 38px; font-size: 14px; border-radius: 10px; }
-.btn.link { background: none; color: var(--accent); height: auto; padding: 4px 0; width: auto; font-weight: 700; }
+.btn.sm { height: 40px; font-size: 15px; border-radius: 12px; }
+.btn.link { background: none; color: var(--accent); height: auto; padding: 6px 0; width: auto; font-weight: 500; font-size: 16px; }
 .btns { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; }
 .stack > * + * { margin-top: 10px; }
 .field { display: block; }
-.field > span { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin: 0 2px 5px; }
-input, select, textarea { width: 100%; height: 46px; padding: 0 13px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); outline: none; font-weight: 600; }
-textarea { height: 120px; padding: 11px 13px; resize: none; line-height: 1.4; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-input::placeholder, textarea::placeholder { color: var(--ink-3); font-weight: 500; }
-select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: calc(100% - 19px) 20px, calc(100% - 14px) 20px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+.field > span { display: block; font-size: 13px; font-weight: 500; color: var(--ink-3); margin: 0 4px 6px; }
+input, select, textarea { width: 100%; height: 48px; padding: 0 14px; border-radius: 12px; background: var(--surface-2); border: 0; outline: none; font-weight: 400; font-size: 17px; }
+.group input, .group select, .group textarea { background: var(--surface-2); }
+textarea { height: 120px; padding: 12px 14px; resize: none; line-height: 1.4; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 2px var(--accent); }
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: calc(100% - 19px) 21px, calc(100% - 14px) 21px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
 .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; gap: 2px; }
-.seg button { height: 36px; border-radius: 8px; font-weight: 700; font-size: 14px; color: var(--ink-2); }
-.seg button.on { background: var(--surface); color: var(--accent); box-shadow: 0 0 0 1px var(--line); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; background: var(--surface-2); border-radius: 10px; gap: 2px; }
+.seg button { height: 32px; border-radius: 8px; font-weight: 500; font-size: 14px; color: var(--ink); }
+.seg button.on { background: var(--surface); font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.04); }
+:root[data-theme="dark"] .seg button.on { background: #636366; }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chip { flex: none; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 13.5px; color: var(--ink-2); }
-.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.sw { position: relative; width: 46px; height: 28px; border-radius: 14px; background: var(--line); flex: none; transition: background .15s; }
-.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.chip { flex: none; height: 34px; padding: 0 14px; border-radius: 17px; background: var(--surface); font-weight: 500; font-size: 14px; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.sheet .chip { background: var(--surface-2); box-shadow: none; }
+.chip.on, .sheet .chip.on { background: var(--ink); color: var(--surface); box-shadow: none; }
+.sw { position: relative; width: 51px; height: 31px; border-radius: 16px; background: var(--line); flex: none; transition: background .2s; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.18); transition: transform .2s; }
 .sw.on { background: var(--accent); }
-.sw.on::after { transform: translateX(18px); }
+.sw.on::after { transform: translateX(20px); }
 .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: grid; place-items: center; }
 .radio.on { border-color: var(--accent); }
 .radio.on::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
-.bar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.group .bar, .hero .bar { background: var(--line); }
-.bar > i { display: block; height: 100%; border-radius: 3px; transition: width .5s cubic-bezier(.3, .7, .2, 1); }
+.bar { height: 6px; border-radius: 3px; background: var(--ring-track); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 3px; transition: width .6s cubic-bezier(.3, .7, .2, 1); }
 
-/* главный экран: шкала дня */
-.hero { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 16px 14px; }
-.hero-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.hero .big { font-size: 46px; line-height: 1; font-weight: 800; letter-spacing: -1.2px; }
-.hero .big.over { color: var(--danger); }
-.hero .cap { margin-top: 6px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
-.facts { margin: 0; display: grid; gap: 5px; text-align: right; }
-.facts div { display: flex; justify-content: flex-end; gap: 10px; font-size: 13px; }
-.facts dt { color: var(--ink-3); font-weight: 600; }
-.facts dd { margin: 0; min-width: 44px; font-weight: 800; }
-.budget { position: relative; display: flex; height: 14px; margin: 18px 0 10px; border-radius: 7px; background: var(--line); overflow: hidden; gap: 2px; }
-.budget i { display: block; height: 100%; transition: width .6s cubic-bezier(.3, .7, .2, 1); }
-.budget .s1 { background: var(--s1); } .budget .s2 { background: var(--s2); } .budget .s3 { background: var(--s3); } .budget .s4 { background: var(--s4); }
-.tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
-.legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.legend div { font-size: 12px; color: var(--ink-3); font-weight: 600; min-width: 0; }
-.legend b { display: block; color: var(--ink); font-size: 14px; font-weight: 800; margin-top: 1px; }
-.legend span { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
-.macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.macro .n { font-size: 12.5px; color: var(--ink-2); font-weight: 700; }
-.macro .v { margin: 2px 0 7px; font-size: 18px; font-weight: 800; }
-.macro .v small { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+/* главный экран: кольцо калорий */
+.hero { background: var(--surface); border-radius: 28px; padding: 20px 18px 18px; }
+.ringrow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
+.side { text-align: center; }
+.side .v { font: 600 22px/1.1 var(--round); letter-spacing: -0.02em; }
+.side .n { margin-top: 4px; font-size: 12px; color: var(--ink-3); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.side .n .i { width: 14px; height: 14px; }
+.ring { position: relative; width: 172px; height: 172px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+.ring circle { fill: none; stroke-width: 16; stroke-linecap: round; }
+.ring .trk { stroke: var(--ring-track); }
+.ring .val { stroke: var(--accent); transition: stroke-dashoffset .9s cubic-bezier(.3, .7, .2, 1); }
+.ring.over .val { stroke: var(--danger); }
+.ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.ring .big { font: 700 42px/1 var(--round); letter-spacing: -0.035em; }
+.ring.over .big { color: var(--danger); }
+.ring .cap { margin-top: 5px; font-size: 13px; color: var(--ink-3); }
+.macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.macro .n { font-size: 13px; color: var(--ink-2); font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.macro .n::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mc); }
+.macro .v { margin: 3px 0 7px; font: 600 17px var(--round); }
+.macro .v small { font: 400 13px var(--font); color: var(--ink-3); }
+.macro .bar { height: 7px; }
+.macro .bar > i { background: var(--mc); }
+.budget, .legend, .facts { display: none; }
 
 /* приёмы пищи */
-.meal-h { display: flex; align-items: center; gap: 10px; margin: 20px 2px 8px; }
-.meal-h .ico-box { width: 30px; height: 30px; border-radius: 9px; }
-.meal-h .t { font-weight: 800; font-size: 15px; }
-.meal-h .k { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
-.meal-h .add { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }
-.meal-h .add:active { transform: scale(.92); }
-.mac { display: inline-flex; gap: 10px; }
+.meal { margin-top: 12px; background: var(--surface); border-radius: 22px; overflow: hidden; }
+.meal-h { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; }
+.meal-h .emo { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; flex: none; background: var(--mc-soft); }
+.meal-h .t { font-weight: 600; font-size: 17px; }
+.meal-h .k { font-size: 13px; color: var(--ink-3); margin-top: 1px; }
+.meal-h .k b { color: var(--ink); font-weight: 600; font-family: var(--round); }
+.meal-h .add { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--mc-soft); color: var(--mc); }
+.meal-h .add .i { stroke-width: 2.4; width: 20px; height: 20px; }
+.meal-h .add:active { transform: scale(.9); }
+.meal .mbar { height: 3px; margin: -4px 16px 10px 72px; border-radius: 2px; background: var(--ring-track); overflow: hidden; }
+.meal .mbar i { display: block; height: 100%; background: var(--mc); border-radius: 2px; }
+.meal .row { padding: 8px 16px; min-height: 60px; }
+.meal .row::before { content: ""; position: absolute; top: 0; left: 72px; right: 0; border-top: 0.5px solid var(--line); }
+.meal .mbar + .row::before { display: none; }
+.mac { display: inline-flex; gap: 8px; }
 .mac span { display: inline-flex; gap: 3px; }
-.mac b { font-weight: 700; }
+.mac b { font-weight: 600; }
 .mac .p b { color: var(--prot); } .mac .f b { color: var(--fat); } .mac .c b { color: var(--carb); }
 
 /* вода */
-.water .top-r { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
-.water .bar > i { background: var(--water); }
-.water .btns { margin-top: 12px; }
+.water .top-r { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.water .top-r b { font: 700 28px var(--round); letter-spacing: -0.02em; }
+.cups { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 14px; }
+.cups i { height: 30px; border-radius: 6px 6px 9px 9px; background: var(--ring-track); position: relative; overflow: hidden; }
+.cups i.on { background: var(--water); }
+.cups i.half { background: linear-gradient(to top, var(--water) 50%, var(--ring-track) 50%); }
+.water .bar { display: none; }
+.water .btns { margin-top: 0; }
+.water .btn { white-space: nowrap; gap: 4px; font-size: 15px; }
+.water .btn .i { width: 16px; height: 16px; stroke-width: 2.4; }
 
 /* нижнее меню */
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
-.tabbar .wrap { display: grid; grid-template-columns: repeat(5, 1fr); padding: 0 6px; }
-.tabbar button { position: relative; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--ink-3); font-size: 11px; font-weight: 700; }
-.tabbar button .i { width: 23px; height: 23px; }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--blur-bg); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar .wrap { display: grid; grid-template-columns: repeat(5, 1fr); padding: 0 4px; }
+.tabbar button { position: relative; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink-3); font-size: 10.5px; font-weight: 500; }
+.tabbar button .i { width: 25px; height: 25px; stroke-width: 1.7; }
 .tabbar button.on { color: var(--accent); }
-.tabbar button.on::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); }
+.tabbar button.on .i { stroke-width: 2.2; }
 
 /* шторки и уведомления */
-.backdrop { position: fixed; inset: 0; z-index: 95; background: var(--overlay); opacity: 0; transition: opacity .2s; }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 96; max-width: 560px; margin: 0 auto; max-height: 90vh; display: flex; flex-direction: column; background: var(--surface); border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform .25s cubic-bezier(.3, .8, .3, 1); padding-bottom: env(safe-area-inset-bottom); }
+.backdrop { position: fixed; inset: 0; z-index: 95; background: var(--overlay); opacity: 0; transition: opacity .25s; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 96; max-width: 560px; margin: 0 auto; max-height: 92vh; display: flex; flex-direction: column; background: var(--surface); border-radius: 14px 14px 0 0; transform: translateY(100%); transition: transform .32s cubic-bezier(.2, .9, .3, 1); padding-bottom: env(safe-area-inset-bottom); }
+.sheet::before { content: ""; position: absolute; top: 6px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line); }
 #sheetRoot.open .backdrop { opacity: 1; }
 #sheetRoot.open .sheet { transform: none; }
-.sheet-h { display: flex; align-items: center; gap: 8px; padding: 14px 14px 8px 18px; }
-.sheet-h h3 { margin: 0; flex: 1; font-size: 18px; font-weight: 800; min-width: 0; }
-.x { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-2); }
-.sheet-b { overflow-y: auto; padding: 4px 16px 18px; -webkit-overflow-scrolling: touch; }
-.sheet-b .group { border-radius: 12px; }
-.toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); z-index: 120; max-width: calc(100% - 32px); padding: 11px 16px; border-radius: 12px; background: var(--ink); color: var(--bg); font-weight: 700; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+.sheet-h { display: flex; align-items: center; gap: 8px; padding: 20px 16px 10px 20px; }
+.sheet-h h3 { margin: 0; flex: 1; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; min-width: 0; }
+.x { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-3); }
+.x .i { width: 16px; height: 16px; stroke-width: 2.4; }
+.sheet-b { overflow-y: auto; padding: 4px 16px 20px; -webkit-overflow-scrolling: touch; }
+.sheet-b .group { border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--line); }
+.toast { position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); z-index: 120; max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 16px; background: var(--ink); color: var(--surface); font-weight: 500; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.err { background: var(--danger); color: #fff; }
 
 /* таймер отдыха */
 .timer { text-align: center; }
-.timer .t { font-size: 52px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; color: var(--accent); }
+.timer .t { font: 700 56px/1.1 var(--round); letter-spacing: -0.03em; color: var(--accent); }
 .timer .t.done { color: var(--danger); }
 .timer .chips { justify-content: center; margin: 10px 0 12px; }
 
 /* графики */
 canvas.chart { width: 100%; height: 200px; display: block; }
 .cal-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 140px; align-items: end; position: relative; padding-top: 6px; }
-.cal-bars .col { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; align-items: center; gap: 5px; }
-.cal-bars .b { width: 100%; max-width: 30px; border-radius: 6px 6px 3px 3px; background: var(--accent); min-height: 3px; }
+.cal-bars .col { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; align-items: center; gap: 6px; }
+.cal-bars .b { width: 100%; max-width: 26px; border-radius: 8px; background: var(--accent); min-height: 4px; }
 .cal-bars .b.over { background: var(--danger); }
-.cal-bars .b.none { background: var(--line); }
-.cal-bars .d { font-size: 11.5px; color: var(--ink-3); font-weight: 700; }
-.cal-bars .col.cur .d { color: var(--ink); }
-.cal-line { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink-3); pointer-events: none; }
+.cal-bars .b.none { background: var(--ring-track); }
+.cal-bars .d { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.cal-bars .col.cur .d { color: var(--ink); font-weight: 700; }
+.cal-line { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink-3); pointer-events: none; opacity: .6; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
-.tile .n { font-size: 12.5px; color: var(--ink-3); font-weight: 700; }
-.tile .v { font-size: 24px; font-weight: 800; letter-spacing: -.5px; margin-top: 2px; }
-.tile .v small { font-size: 13px; color: var(--ink-3); font-weight: 600; letter-spacing: 0; }
+.tile { background: var(--surface); border-radius: 18px; padding: 14px 16px; }
+.tile .n { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+.tile .v { font: 700 26px var(--round); letter-spacing: -0.03em; margin-top: 2px; }
+.tile .v small { font: 400 14px var(--font); color: var(--ink-3); letter-spacing: 0; }
 
 /* профиль */
-.me { display: flex; align-items: center; gap: 14px; padding: 6px 2px 2px; }
-.me .avatar { width: 62px; height: 62px; font-size: 24px; }
-.me .nm { font-size: 20px; font-weight: 800; }
+.me { display: flex; align-items: center; gap: 14px; padding: 8px 4px 4px; }
+.me .avatar { width: 64px; height: 64px; font-size: 26px; }
+.me .nm { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
 .pagehead { display: flex; align-items: center; gap: 6px; margin: 2px 0 14px -6px; }
-.pagehead .back { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 19px; color: var(--ink-2); }
-.pagehead h1 { margin: 0; font-size: 20px; font-weight: 800; }
-.note { font-size: 12.5px; color: var(--ink-3); margin: 8px 3px 0; line-height: 1.45; }
-.result { background: var(--accent-soft); border-radius: 14px; padding: 14px; }
-.result .big { font-size: 34px; font-weight: 800; letter-spacing: -.8px; color: var(--accent); }
+.pagehead .back { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 19px; color: var(--accent); }
+.pagehead h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+.note { font-size: 13px; color: var(--ink-3); margin: 8px 4px 0; line-height: 1.45; }
+.result { background: var(--accent-soft); border-radius: 18px; padding: 16px; }
+.result .big { font: 700 34px var(--round); letter-spacing: -0.03em; color: var(--accent); }
 
 /* первое знакомство */
 .wizard { position: fixed; inset: 0; z-index: 90; background: var(--bg); overflow-y: auto; display: none; }
 .wizard.open { display: block; }
-.wizard .wrap { padding-top: 18px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); min-height: 100%; display: flex; flex-direction: column; }
-.wz-prog { display: flex; gap: 5px; margin-bottom: 26px; }
+.wizard .wrap { padding-top: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); min-height: 100%; display: flex; flex-direction: column; }
+.wz-prog { display: flex; gap: 5px; margin-bottom: 28px; }
 .wz-prog i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
 .wz-prog i.on { background: var(--accent); }
-.wizard h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.5px; margin: 0 0 8px; font-weight: 800; }
-.wizard .lead { color: var(--ink-2); margin: 0 0 22px; }
+.wizard h1 { font-size: 30px; line-height: 1.15; letter-spacing: -0.03em; margin: 0 0 8px; font-weight: 700; }
+.wizard .lead { color: var(--ink-2); margin: 0 0 22px; font-size: 17px; }
 .wz-foot { margin-top: auto; padding-top: 22px; }
-.opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+.opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px 16px; text-align: left; background: var(--surface); border: 2px solid transparent; border-radius: 16px; margin-bottom: 10px; }
 .opt.on { border-color: var(--accent); background: var(--accent-soft); }
-.opt .ttl { font-size: 16px; }
-.loading { padding: 60px 20px; text-align: center; color: var(--ink-3); font-weight: 600; }
+.opt .ttl { font-size: 17px; }
+.loading { padding: 80px 20px; text-align: center; color: var(--ink-3); font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 .stepper { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; }
-.stepper input { text-align: center; font-size: 20px; font-weight: 800; height: 52px; }
+.stepper input { text-align: center; font: 600 22px var(--round); height: 52px; }
 .stepper .btn { height: 52px; padding: 0; }
-.pv { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 12px 14px; background: var(--surface-2); border-radius: 12px; margin: 12px 0; }
-.pv b { font-size: 24px; font-weight: 800; }
+.pv { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-radius: 14px; margin: 12px 0; }
+.pv b { font: 700 26px var(--round); letter-spacing: -0.02em; }
 .shop-row .ck { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; flex: none; color: transparent; }
 .shop-row.done .ck { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .shop-row.done .ttl { color: var(--ink-3); text-decoration: line-through; }
 .shop-row .ck .i { width: 14px; height: 14px; stroke-width: 2.6; }
-.search { position: relative; margin-bottom: 10px; }
-.search .i { position: absolute; left: 13px; top: 13px; color: var(--ink-3); }
-.search input { padding-left: 40px; }
+.search { position: relative; margin-bottom: 12px; }
+.search .i { position: absolute; left: 12px; top: 11px; color: var(--ink-3); width: 18px; height: 18px; }
+.search input { padding-left: 38px; height: 40px; border-radius: 11px; font-size: 17px; }
 .link-row { display: flex; justify-content: center; padding-top: 12px; }
 
+/* выбор продукта */
+.pk-head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.pk-head .thumb { width: 64px; height: 64px; border-radius: 16px; font-size: 34px; }
+.pk-head .ttl { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.ai-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; background: linear-gradient(120deg, var(--accent-soft), var(--s3-soft)); text-align: left; cursor: pointer; }
+.ai-btn .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; }
+.ai-photo { width: 100%; max-height: 220px; object-fit: cover; border-radius: 16px; display: block; margin-bottom: 12px; }
+.ai-row { display: grid; grid-template-columns: 26px 1fr 84px; align-items: center; gap: 10px; padding: 10px 0; border-top: 0.5px solid var(--line); }
+.ai-row:first-child { border-top: 0; }
+.ai-row input[type="number"], .ai-row input.g { height: 40px; text-align: center; font: 600 16px var(--round); padding: 0 6px; }
+.ck2 { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; color: transparent; }
+.ck2.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ck2 .i { width: 14px; height: 14px; stroke-width: 3; }
+.spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--ring-track); border-top-color: var(--accent); animation: spin .8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.photo-big { width: 100%; max-height: 260px; object-fit: cover; border-radius: 16px; display: block; margin-bottom: 10px; background: var(--surface-2); }
+
+/* статистика владельца */
+.sbars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; height: 110px; align-items: end; }
+.sbars .c { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 4px; }
+.sbars .b { width: 100%; border-radius: 4px; background: var(--accent); min-height: 3px; }
+.sbars .b.z { background: var(--ring-track); }
+.sbars .d { font-size: 10px; color: var(--ink-3); }
+.sbars .v { font: 600 10px var(--round); color: var(--ink-2); }
 </style>
 </head>
 <body>
@@ -922,6 +985,10 @@ canvas.chart { width: 100%; height: 200px; display: block; }
 <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2 5.500 5.500 2-5.500 2-2 5.500-2-5.500-5.500-2 5.500-2zM19 16v4M17 18h4"/></symbol>
 <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4.500 13.500H11L10 22l9-12h-6.500z"/></symbol>
 <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.500 8-8 9-4.500-1-8-4-8-9V6z"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.500 4 3.500 3-2.500 4 3.500"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v5M17 3c-2 1.500-2.500 5-2.500 7.500 0 1 .8 1.500 2.500 1.500zM17 12v9"/></symbol>
 </defs></svg>
 <header class="top" id="top"></header>
 <main id="view"></main>
@@ -970,10 +1037,10 @@ function dateLabel(ds) {
 const ddmm = ds => ds.slice(8, 10) + '.' + ds.slice(5, 7);
 
 const MEALS = [
-  { k: 'breakfast', n: 'Завтрак', icon: 'sunrise', pct: 25, c: 's1' },
-  { k: 'lunch', n: 'Обед', icon: 'sun', pct: 35, c: 's2' },
-  { k: 'dinner', n: 'Ужин', icon: 'moon', pct: 25, c: 's3' },
-  { k: 'snack', n: 'Перекус', icon: 'apple', pct: 15, c: 's4' },
+  { k: 'breakfast', n: 'Завтрак', icon: 'sunrise', pct: 25, c: 's1', e: '🍳' },
+  { k: 'lunch', n: 'Обед', icon: 'sun', pct: 35, c: 's2', e: '🥗' },
+  { k: 'dinner', n: 'Ужин', icon: 'moon', pct: 25, c: 's3', e: '🍝' },
+  { k: 'snack', n: 'Перекус', icon: 'apple', pct: 15, c: 's4', e: '🍎' },
 ];
 const MEAL_GEN = { breakfast: 'завтрак', lunch: 'обед', dinner: 'ужин', snack: 'перекус' };
 const GOALS = { lose: 'Снизить вес', maintain: 'Удерживать вес', gain: 'Набрать вес' };
@@ -1131,47 +1198,117 @@ const CATS = [['all', 'Все'], ['meat', 'Мясо'], ['fish', 'Рыба'], ['d
 const mealOf = k => MEALS.find(m => m.k === k) || MEALS[3];
 const macLine = (p, f, c) => '<span class="mac"><span class="p">Б <b>' + n0(p) + '</b></span><span class="f">Ж <b>' + n0(f) + '</b></span><span class="c">У <b>' + n0(c) + '</b></span></span>';
 
+/* Эмодзи для продуктов без фото: по ключевым словам названия. */
+const FOOD_EMOJI = [
+  [/кофе|капучино|латте|американо|эспрессо|раф\b|флэт/, '☕'], [/чай|матча/, '🍵'], [/кола|газиров|лимонад|фрустайл|добрый|физз|тоник|напиток|тархун|энергет/, '🥤'],
+  [/сок|смузи/, '🧃'], [/вода/, '💧'], [/пиво/, '🍺'], [/вино/, '🍷'], [/коктейл|молочный коктейль|милкшейк/, '🥤'],
+  [/мороженое|пломбир|айс де люкс|айс микс|рожок/, '🍦'], [/чизкейк|торт|пирожн|тарт|капкейк|профитрол/, '🍰'], [/донат|пончик/, '🍩'],
+  [/печенье|макарони\b|вупи/, '🍪'], [/шоколад|конфет/, '🍫'], [/круассан|улитк/, '🥐'], [/маффин с яйц|омлет|яичниц|большой завтрак/, '🍳'], [/яйц/, '🥚'],
+  [/бургер|чизбургер|гамбургер|гранд|биг хит|биг спешиал|шефбургер|маэстро|ростмастер|чикен хит|чикенбургер/, '🍔'],
+  [/ролл|шаурм|лаваш|кесадиль|твистер/, '🌯'], [/пицц/, '🍕'], [/фри|картофел|дольки|оладуш/, '🍟'], [/наггет|стрипс|байтс|крыл|ножк|курин|курица|бедро|грудк|индейк/, '🍗'],
+  [/креветк/, '🍤'], [/лосос|форел|сельд|скумбр|тунец|рыб|треск|минта|икра|шпрот/, '🐟'], [/говяд|свинин|фарш|стейк|котлет|бифштекс/, '🥩'],
+  [/колбас|сосиск|ветчин|бекон|сервелат/, '🌭'], [/пельмен|вареник/, '🥟'], [/суп|борщ|бульон|щи\b/, '🍲'], [/салат|цезарь/, '🥗'],
+  [/плов|рис/, '🍚'], [/макарон|спагетти|паста|лапш|рамен|доширак/, '🍝'], [/гречк|гречн|каша|овсян|хлопья|мюсли|геркулес|булгур|киноа|пшен|перлов|ячнев/, '🥣'],
+  [/хлеб|батон|хлебц|тост|чиабатт|лепешк|галет/, '🍞'], [/блин|сырник|оладь|панкейк/, '🥞'], [/сырок/, '🍫'], [/творог|творож/, '🥛'],
+  [/сыр|моцарел|фета|чеддер/, '🧀'], [/молок|кефир|йогурт|ряженк|сметан|сливк|актибио|простокваш/, '🥛'], [/масло слив/, '🧈'],
+  [/масло|майонез|соус|кетчуп|горчиц/, '🫙'], [/мёд|мед\b|джем|варенье|сироп/, '🍯'], [/сахар/, '🍬'], [/чипс|сухарик|кириешк|снек/, '🥔'],
+  [/орех|миндал|кешью|арахис|фисташ|семечк|семена|козинак/, '🥜'], [/батончик|протеин/, '🍫'], [/банан/, '🍌'], [/яблок/, '🍎'],
+  [/груш/, '🍐'], [/апельсин|мандарин|грейпфрут/, '🍊'], [/лимон|лайм/, '🍋'], [/виноград|изюм/, '🍇'], [/клубник|земляник/, '🍓'],
+  [/черник|голубик/, '🫐'], [/вишн|черешн/, '🍒'], [/персик|абрикос|курага/, '🍑'], [/ананас/, '🍍'], [/манго/, '🥭'], [/киви/, '🥝'],
+  [/арбуз/, '🍉'], [/дыня/, '🍈'], [/авокадо/, '🥑'], [/финик/, '🌴'], [/огур/, '🥒'], [/помидор|томат/, '🍅'], [/морков/, '🥕'],
+  [/брокколи|капуст/, '🥦'], [/перец/, '🫑'], [/баклажан/, '🍆'], [/кукуруз/, '🌽'], [/горош|фасол|нут|чечевиц|тофу/, '🫘'],
+  [/салат лист|шпинат|зелень/, '🥬'], [/лук\b|лук реп/, '🧅'], [/свекл|свёкл/, '🍠'], [/кабач/, '🥒'], [/картош/, '🥔'], [/пирожок|пирог|штрудел/, '🥧'],
+];
+const CAT_EMOJI = { meat: '🍗', fish: '🐟', dairy: '🥛', grains: '🥣', veg: '🥦', fruit: '🍎', other: '🍽️' };
+function foodEmoji(name, cat) {
+  const n = norm(name);
+  for (const [re, e] of FOOD_EMOJI) if (re.test(n)) return e;
+  return CAT_EMOJI[cat] || '🍽️';
+}
+const PHOTO = {};
+function thumbHtml(x, opts) {
+  opts = opts || {};
+  if (opts.mealId && opts.photo) return '<span class="thumb"><img data-photo="' + opts.mealId + '" alt="" src="' + (PHOTO[opts.mealId] || '') + '"><span class="cam">' + ic('camera') + '</span></span>';
+  if (x.img) return '<span class="thumb pack"><img src="' + esc(x.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\'' + foodEmoji(x.name, x.cat) + '\'"></span>';
+  return '<span class="thumb">' + foodEmoji(x.name, x.cat) + '</span>';
+}
+/* Фото из дневника загружаются отдельным запросом (нужна подпись Telegram в заголовке). */
+async function loadPhotos() {
+  for (const img of $$('img[data-photo]')) {
+    const id = img.dataset.photo;
+    if (PHOTO[id]) { img.src = PHOTO[id]; continue; }
+    try {
+      const r = await fetch('/api/meal_photo?id=' + id, { headers: { 'X-Telegram-Init-Data': initData, 'X-Fallback-User': tgUserId } });
+      if (!r.ok) continue;
+      PHOTO[id] = URL.createObjectURL(await r.blob());
+      $$('img[data-photo="' + id + '"]').forEach(el => { el.src = PHOTO[id]; });
+    } catch (e) {}
+  }
+}
+/* Сжатие фото на телефоне перед отправкой. */
+function shrinkPhoto(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не удалось открыть фото')); };
+    im.src = url;
+  });
+}
+
 function mealsByType() {
   const out = { breakfast: [], lunch: [], dinner: [], snack: [] };
   S.d.day_meals.forEach(m => { (out[m.meal_type] || out.snack).push(m); });
   return out;
 }
 
+function ringHtml(left, budget, eaten, over) {
+  const r = 76, len = 2 * Math.PI * r, frac = clamp(budget ? eaten / budget : 0, 0, 1);
+  return '<div class="ring' + (over ? ' over' : '') + '"><svg viewBox="0 0 184 184" aria-hidden="true"><circle class="trk" cx="92" cy="92" r="' + r + '"/>' +
+    '<circle class="val" cx="92" cy="92" r="' + r + '" stroke-dasharray="' + len.toFixed(1) + '" stroke-dashoffset="' + (len * (1 - (over ? 1 : frac))).toFixed(1) + '"/></svg>' +
+    '<div class="mid"><div class="big">' + n0(Math.abs(left)) + '</div><div class="cap">' + (left >= 0 ? 'ккал осталось' : 'ккал сверх нормы') + '</div></div></div>';
+}
+
 function renderDiary() {
   const d = S.d, s = d.settings, by = mealsByType();
   const burn = d.today_burn, budget = s.target_cal + burn, eaten = d.today_cal;
   const left = budget - eaten, over = left < -budget * 0.05;
-  const total = Math.max(budget, eaten, 1);
   const sums = MEALS.map(m => by[m.k].reduce((a, x) => a + x.calories, 0));
-  let h = '<div class="hero"><div class="hero-top"><div><div class="big' + (over ? ' over' : '') + '">' + n0(Math.abs(left)) + '</div>' +
-    '<div class="cap">' + (left >= 0 ? 'ккал осталось на сегодня' : 'ккал сверх нормы') + '</div></div>' +
-    '<dl class="facts"><div><dt>Норма</dt><dd>' + n0(s.target_cal) + '</dd></div><div><dt>Съедено</dt><dd>' + n0(eaten) + '</dd></div>' +
-    '<div><dt>Сожжено</dt><dd>' + n0(burn) + '</dd></div></dl></div>' +
-    '<div class="budget" role="img" aria-label="Распределение калорий по приёмам пищи">' +
-    MEALS.map((m, i) => '<i class="' + m.c + '" style="width:' + (sums[i] / total * 100).toFixed(2) + '%"></i>').join('') +
-    (eaten > budget ? '<span class="tick" style="left:calc(' + (budget / total * 100).toFixed(2) + '% - 1px)"></span>' : '') + '</div>' +
-    '<div class="legend">' + MEALS.map((m, i) => '<div><span style="background:var(--' + m.c + ')"></span>' + m.n + '<b>' + n0(sums[i]) + '</b></div>').join('') + '</div>' +
+  let h = '<section class="hero" aria-label="Калории за день"><div class="ringrow">' +
+    '<div class="side"><div class="v">' + n0(eaten) + '</div><div class="n">' + ic('fork') + 'съедено</div></div>' +
+    ringHtml(left, budget, eaten, over) +
+    '<div class="side"><div class="v">' + n0(burn) + '</div><div class="n">' + ic('flame') + 'сожжено</div></div></div>' +
     '<div class="macros">' + [['Белки', d.today_p, s.target_p, 'prot'], ['Жиры', d.today_f, s.target_f, 'fat'], ['Углеводы', d.today_c, s.target_c, 'carb']].map(x =>
-      '<div class="macro"><div class="n">' + x[0] + '</div><div class="v">' + n0(x[1]) + ' <small>/ ' + n0(x[2]) + ' г</small></div>' +
-      '<div class="bar"><i style="width:' + clamp(x[2] ? x[1] / x[2] * 100 : 0, 0, 100) + '%;background:var(--' + x[3] + ')"></i></div></div>').join('') + '</div></div>';
+      '<div class="macro" style="--mc:var(--' + x[3] + ')"><div class="n">' + x[0] + '</div><div class="v">' + n0(x[1]) + ' <small>/ ' + n0(x[2]) + ' г</small></div>' +
+      '<div class="bar"><i style="width:' + clamp(x[2] ? x[1] / x[2] * 100 : 0, 0, 100) + '%"></i></div></div>').join('') + '</div></section>';
 
   if (!d.day_meals.length) {
-    h += '<div class="group" style="margin-top:14px"><div class="empty"><b>В этот день ещё нет записей.</b><br>Добавьте продукт в нужный приём пищи, перенесите вчерашний день или соберите меню автоматически.</div>' +
-      '<div class="pad stack" style="padding-top:0"><button class="btn soft" data-act="copy-prev">' + ic('copy') + 'Скопировать предыдущий день</button>' +
+    h += '<div class="group" style="margin-top:12px"><div class="empty"><b>Пока пусто.</b> Нажмите «+» у нужного приёма пищи, перенесите вчерашний день или соберите меню автоматически.</div>' +
+      '<div class="pad stack" style="padding-top:0"><button class="btn soft" data-act="copy-prev">' + ic('copy') + 'Скопировать вчерашний день</button>' +
       '<button class="btn soft" data-act="gen-day">' + ic('spark') + 'Собрать меню на день</button></div></div>';
   }
   MEALS.forEach((m, i) => {
     const list = by[m.k], tgt = Math.round(s.target_cal * m.pct / 100);
-    h += '<div class="meal-h"><span class="ico-box">' + ic(m.icon, '') + '</span><div><div class="t">' + m.n + '</div><div class="k">' + n0(sums[i]) + ' из ~' + n0(tgt) + ' ккал</div></div>' +
-      '<button class="add" data-act="add-food" data-m="' + m.k + '" aria-label="Добавить: ' + m.n + '">' + ic('plus') + '</button></div>';
-    if (list.length) {
-      h += '<div class="group">' + list.map(x => '<button class="row" data-act="edit-meal" data-id="' + x.id + '"><div class="grow"><div class="ttl">' + esc(x.food_name) + '</div>' +
-        '<div class="sub i2"><span>' + n0(x.grams) + ' г</span>' + macLine(x.p, x.f, x.c) + '</div></div><div class="end">' + n0(x.calories) + ' <span class="sub">ккал</span></div></button>').join('') + '</div>';
-    }
+    h += '<section class="meal" style="--mc:var(--' + m.c + ');--mc-soft:var(--' + m.c + '-soft)"><div class="meal-h"><span class="emo" aria-hidden="true">' + m.e + '</span>' +
+      '<div class="grow"><div class="t">' + m.n + '</div><div class="k"><b>' + n0(sums[i]) + '</b> из ' + n0(tgt) + ' ккал</div></div>' +
+      '<button class="add" data-act="add-food" data-m="' + m.k + '" aria-label="Добавить: ' + m.n + '">' + ic('plus') + '</button></div>' +
+      (list.length ? '<div class="mbar"><i style="width:' + clamp(tgt ? sums[i] / tgt * 100 : 0, 0, 100) + '%"></i></div>' : '');
+    h += list.map(x => '<button class="row" data-act="edit-meal" data-id="' + x.id + '">' + thumbHtml({ name: x.food_name }, { mealId: x.id, photo: x.photo }) +
+      '<div class="grow"><div class="ttl">' + esc(x.food_name) + '</div>' +
+      '<div class="sub i2"><span>' + n0(x.grams) + ' г</span>' + macLine(x.p, x.f, x.c) + '</div></div><div class="end">' + n0(x.calories) + '</div></button>').join('');
+    h += '</section>';
   });
 
   const wp = Math.min(100, s.target_water ? d.water_ml / s.target_water * 100 : 0);
-  h += '<div class="h2">Вода</div><div class="group pad water"><div class="top-r"><div><b style="font-size:22px">' + n1(d.water_ml / 1000) + '</b> <span class="mut">из ' + n1(s.target_water / 1000) + ' л</span></div><span class="sub">' + Math.round(wp) + '%</span></div>' +
+  const cups = 8, per = s.target_water / cups, full = d.water_ml / per;
+  h += '<div class="h2">Вода <small>' + Math.round(wp) + '%</small></div><div class="group pad water"><div class="top-r"><div><b>' + n1(d.water_ml / 1000) + '</b> <span class="mut">из ' + n1(s.target_water / 1000) + ' л</span></div></div>' +
+    '<div class="cups" aria-hidden="true">' + Array.from({ length: cups }, (_, i) => '<i class="' + (full >= i + 1 ? 'on' : (full > i + 0.25 ? 'half' : '')) + '"></i>').join('') + '</div>' +
     '<div class="bar"><i style="width:' + wp + '%"></i></div>' +
     '<div class="btns"><button class="btn sec sm" data-act="water" data-v="-' + s.water_glass + '">' + ic('minus') + s.water_glass + ' мл</button>' +
     '<button class="btn soft sm" data-act="water" data-v="' + s.water_glass + '">' + ic('plus') + s.water_glass + ' мл</button>' +
@@ -1183,13 +1320,13 @@ function renderDiary() {
       d.day_workouts.map(w => '<div class="row"><span class="ico-box">' + ic('bolt') + '</span><div class="grow"><div class="ttl">' + esc(w.name) + '</div><div class="sub">' + n0(w.mins) + ' мин</div></div><div class="end">−' + n0(w.cal) + ' <span class="sub">ккал</span></div></div>').join('') + '</div>';
   }
   if (d.day_meals.length) {
-    h += '<div class="link-row"><button class="btn link" data-act="copy-prev">Скопировать предыдущий день сюда</button></div>';
+    h += '<div class="link-row"><button class="btn link" data-act="copy-prev">Скопировать вчерашний день сюда</button></div>';
   }
   return h;
 }
 
 /* ---------- выбор продукта ---------- */
-function perOf(it) { return { name: it.name, cal: it.cal, p: it.p, f: it.f, c: it.c }; }
+function perOf(it) { return { name: it.name, cal: it.cal, p: it.p, f: it.f, c: it.c, cat: it.cat }; }
 function pickerSource() {
   const pk = S.picker, d = S.d, q = norm(pk.q);
   const recent = d.recent.map(r => { const g = r.grams || 100; return { name: r.name, cal: r.cal / g * 100, p: r.p / g * 100, f: r.f / g * 100, c: r.c / g * 100, g: Math.round(g), src: 'recent' }; });
@@ -1217,16 +1354,16 @@ function pickerList() {
     return '<div class="empty">' + msg + '</div>';
   }
   const limit = pk.tab === 'rest' && !pk.q ? 300 : 120;
-  return list.slice(0, limit).map((x, i) => '<button class="row" data-act="pick" data-i="' + i + '"><div class="grow"><div class="ttl">' + esc(x.name) + '</div>' +
-    (x.brand ? '<div class="sub">' + esc(x.brand) + (x.src === 'restaurant' && x.g ? ' · порция ' + n0(x.g) + ' г' : '') + '</div>' : '') +
-    '<div class="sub i2"><span>' + n0(x.cal) + ' ккал / 100 г</span>' + macLine(x.p, x.f, x.c) + '</div></div>' + ic('chev-r', 'chev') + '</button>').join('') +
+  return list.slice(0, limit).map((x, i) => '<button class="row thumbed" data-act="pick" data-i="' + i + '">' + thumbHtml(x) + '<div class="grow"><div class="ttl">' + esc(x.name) + '</div>' +
+    (x.brand ? '<div class="sub">' + esc(x.brand) + (x.portions && x.portions.length > 1 ? ' · ' + x.portions.length + ' порции' : (x.src === 'restaurant' && x.g ? ' · ' + n0(x.g) + ' г' : '')) + '</div>' : '') +
+    '<div class="sub i2"><span>' + n0(x.cal) + ' ккал</span>' + macLine(x.p, x.f, x.c) + '</div></div>' + ic('chev-r', 'chev') + '</button>').join('') +
     (pk.q && pk.loading ? '<div class="empty">Ищем ещё в общей базе…</div>' : '');
 }
 /* Общая база продуктов на сервере: сети ресторанов + магазинные продукты. */
 let pkTimer = 0, pkSeq = 0;
 function fromServer(x) {
   const full = (x.src === 'restaurant' && x.brand ? x.name + ' · ' + x.brand : x.name).slice(0, 100);
-  return { name: x.name, full, brand: x.brand || '', cal: x.cal, p: x.p, f: x.f, c: x.c, g: x.g || 100, portion: x.portion || '', src: x.src };
+  return { name: x.name, full, brand: x.brand || '', cal: x.cal, p: x.p, f: x.f, c: x.c, g: x.g || 100, portion: x.portion || '', src: x.src, img: x.img || '', portions: x.portions || [] };
 }
 function searchRemote() {
   clearTimeout(pkTimer);
@@ -1260,7 +1397,12 @@ async function loadChains() {
 }
 function pickerHtml() {
   const pk = S.picker;
-  let h = '<div class="search">' + ic('search') + '<input id="pkq" data-in="picker.q" placeholder="Найти продукт" value="' + esc(pk.q) + '" autocomplete="off"></div>';
+  let h = '<div class="search">' + ic('search') + '<input id="pkq" data-in="picker.q" placeholder="Продукт, блюдо или «кфс стрипсы»" value="' + esc(pk.q) + '" autocomplete="off"></div>';
+  if (S.d.features && S.d.features.recognize && !pk.replace) {
+    h += '<label class="ai-btn"><span class="ic">' + ic('camera') + '</span><span class="grow"><span class="ttl" style="display:block">Распознать по фото</span>' +
+      '<span class="sub">Сфотографируйте тарелку — посчитаем калории</span></span>' + ic('chev-r', 'chev') +
+      '<input type="file" accept="image/*" class="vh" data-ch="aiPhoto"></label>';
+  }
   h += '<div id="pkTabs">' + pickerTabs() + '</div>';
   h += '<div class="group" id="pkList">' + pickerList() + '</div>';
   h += '<div class="link-row"><button class="btn link" data-act="manual">Добавить вручную</button></div>';
@@ -1289,13 +1431,18 @@ function openPicker(meal, replaceId) {
 }
 function amountHtml() {
   const pk = S.picker, it = pk.sel;
-  const portions = [50, 100, 150, 200, 250];
-  if (it.g && portions.indexOf(Math.round(it.g)) < 0) portions.unshift(Math.round(it.g));
-  return '<div class="ttl" style="font-size:17px;margin-bottom:4px">' + esc(it.name) + '</div><div class="sub" style="margin-bottom:14px">' +
-    (it.brand ? esc(it.brand) + ' · ' : '') + n0(it.cal) + ' ккал на 100 г' + (it.src === 'restaurant' && it.g ? ' · порция ' + n0(it.g) + ' г' : '') + '</div>' +
+  let chips;
+  if (it.portions && it.portions.length) chips = it.portions.map(x => [x.g, x.label + ' · ' + n0(x.g) + ' г']);
+  else {
+    const g = [50, 100, 150, 200, 250];
+    if (it.g && g.indexOf(Math.round(it.g)) < 0) g.unshift(Math.round(it.g));
+    chips = g.map(v => [v, v + ' г']);
+  }
+  return '<div class="pk-head">' + thumbHtml(it) + '<div class="grow"><div class="ttl">' + esc(it.name) + '</div><div class="sub">' +
+    (it.brand ? esc(it.brand) + ' · ' : '') + n0(it.cal) + ' ккал на 100 г</div><div class="sub">' + macLine(it.p, it.f, it.c) + '</div></div></div>' +
     '<div class="field"><span>Вес порции, г</span><div class="stepper"><button class="btn sec" data-act="pk-step" data-v="-10" aria-label="Меньше">' + ic('minus') + '</button>' +
     '<input id="pkg" inputmode="decimal" data-in="picker.g" value="' + esc(pk.g) + '"><button class="btn sec" data-act="pk-step" data-v="10" aria-label="Больше">' + ic('plus') + '</button></div></div>' +
-    '<div class="chips" style="margin:10px 0 0">' + portions.map(v => '<button class="chip" data-act="pk-set" data-v="' + v + '">' + v + ' г</button>').join('') + '</div>' +
+    '<div class="chips" style="margin:10px 0 0">' + chips.map(v => '<button class="chip' + (Math.round(num(pk.g)) === Math.round(v[0]) ? ' on' : '') + '" data-act="pk-set" data-v="' + v[0] + '">' + esc(v[1]) + '</button>').join('') + '</div>' +
     '<div class="pv"><span>Итого</span><span><b id="pvCal">0</b> ккал</span></div><div id="pvMac" class="sub" style="margin:-4px 2px 14px"></div>' +
     '<div class="btns"><button class="btn sec" data-act="pk-back">Назад</button><button class="btn" data-act="pk-add">Добавить</button></div>';
 }
@@ -1326,10 +1473,16 @@ function openEdit(id) {
   const m = S.d.day_meals.find(x => x.id === id); if (!m) return;
   S.edit = { id, g: String(Math.round(m.grams)), type: m.meal_type, g0: Math.round(m.grams) };
   openSheet(m.food_name, editHtml(m));
+  loadPhotos();
 }
 function editHtml(m) {
   const e = S.edit;
-  return '<div class="field"><span>Вес порции, г</span><div class="stepper"><button class="btn sec" data-act="ed-step" data-v="-10" aria-label="Меньше">' + ic('minus') + '</button>' +
+  const photo = m.photo
+    ? '<img class="photo-big" data-photo="' + m.id + '" alt="Фото блюда" src="' + (PHOTO[m.id] || '') + '">' +
+      '<div class="btns" style="margin-bottom:16px"><label class="btn sec sm">' + ic('camera') + 'Заменить<input type="file" accept="image/*" class="vh" data-ch="mealPhoto"></label>' +
+      '<button class="btn dng sm" data-act="photo-del">' + ic('trash') + 'Убрать фото</button></div>'
+    : '<label class="btn soft" style="margin-bottom:16px">' + ic('camera') + 'Добавить фото блюда<input type="file" accept="image/*" class="vh" data-ch="mealPhoto"></label>';
+  return photo + '<div class="field"><span>Вес порции, г</span><div class="stepper"><button class="btn sec" data-act="ed-step" data-v="-10" aria-label="Меньше">' + ic('minus') + '</button>' +
     '<input id="edg" inputmode="decimal" data-in="edit.g" value="' + esc(e.g) + '"><button class="btn sec" data-act="ed-step" data-v="10" aria-label="Больше">' + ic('plus') + '</button></div></div>' +
     '<div class="pv"><span>Итого</span><span><b id="edCal">' + n0(m.calories) + '</b> ккал</span></div><div id="edMac" class="sub" style="margin:-4px 2px 12px">' + macLine(m.p, m.f, m.c) + '</div>' +
     '<div class="field" style="margin-bottom:16px"><span>Приём пищи</span><div class="chips">' + MEALS.map(x => '<button class="chip' + (e.type === x.k ? ' on' : '') + '" data-act="ed-type" data-m="' + x.k + '">' + x.n + '</button>').join('') + '</div></div>' +
@@ -1342,6 +1495,78 @@ function updateEdit() {
   const a = $('#edCal'), b = $('#edMac');
   if (a) a.textContent = n0(m.calories * k);
   if (b) b.innerHTML = macLine(m.p * k, m.f * k, m.c * k);
+}
+
+/* ---------- фото блюда ---------- */
+async function uploadMealPhoto(inp) {
+  const file = inp.files && inp.files[0]; inp.value = '';
+  if (!file || !S.edit) return;
+  const id = S.edit.id;
+  let data;
+  try { data = await shrinkPhoto(file, 720, 0.72); } catch (e) { toast(e.message, true); return; }
+  try { await post('/api/meal_photo', { id, image: data }); } catch (e) { toast(e.message, true); return; }
+  PHOTO[id] = data;
+  const m = S.d.day_meals.find(x => x.id === id); if (m) m.photo = true;
+  closeSheet(); render(); toast('Фото добавлено');
+}
+
+/* ---------- распознавание еды по фото ---------- */
+async function recognizePhoto(inp) {
+  const file = inp.files && inp.files[0]; inp.value = '';
+  if (!file || !S.picker) return;
+  let data;
+  try { data = await shrinkPhoto(file, 1024, 0.8); } catch (e) { toast(e.message, true); return; }
+  S.ai = { photo: data, items: null, busy: true, note: '' };
+  setSheet('Распознаём…', aiHtml());
+  try {
+    const r = await post('/api/recognize', { image: data });
+    S.ai.items = (r.items || []).map(x => Object.assign(x, { on: true, g: String(x.grams) }));
+    S.ai.note = r.note || '';
+  } catch (e) { S.ai.error = e.message; }
+  S.ai.busy = false;
+  if (S.picker) setSheet('Что на фото', aiHtml());
+}
+function aiHtml() {
+  const a = S.ai;
+  let h = '<img class="ai-photo" src="' + a.photo + '" alt="Ваше фото">';
+  if (a.busy) return h + '<div class="spin"></div><p class="note" style="text-align:center">Определяем блюда и вес порций…</p>';
+  if (a.error) return h + '<div class="empty">' + esc(a.error) + '</div><div class="btns"><button class="btn sec" data-act="pk-back">Назад</button></div>';
+  if (!a.items.length) return h + '<div class="empty">' + esc(a.note || 'Не удалось распознать еду. Попробуйте сфотографировать ближе и при хорошем свете.') + '</div><div class="btns"><button class="btn sec" data-act="pk-back">Назад</button></div>';
+  h += '<div class="group pad" style="padding-top:4px;padding-bottom:4px">' + a.items.map((x, i) =>
+    '<div class="ai-row"><button class="ck2' + (x.on ? ' on' : '') + '" data-act="ai-toggle" data-i="' + i + '" aria-label="Выбрать">' + ic('check') + '</button>' +
+    '<div><div class="ttl">' + esc(x.name) + '</div><div class="sub" id="aiK' + i + '">' + n0(x.cal * num(x.g) / 100) + ' ккал</div></div>' +
+    '<input class="g" inputmode="decimal" data-in="ai.items.' + i + '.g" value="' + esc(x.g) + '" aria-label="Вес, г"></div>').join('') + '</div>' +
+    '<p class="note">Вес и калории — оценка по фото. Поправьте граммы, если знаете точнее.</p>' +
+    (a.note ? '<p class="note">' + esc(a.note) + '</p>' : '') +
+    '<div class="btns" style="margin-top:14px"><button class="btn sec" data-act="pk-back">Назад</button><button class="btn" data-act="ai-add">Добавить</button></div>';
+  return h;
+}
+
+/* ---------- статистика (только владелец) ---------- */
+async function loadStats() {
+  S.stats = null; render();
+  try { S.stats = await api('/api/admin_stats'); } catch (e) { S.stats = { error: e.message }; }
+  if (S.page === 'stats') render();
+}
+function renderStats() {
+  const st = S.stats;
+  let h = pageHead('Статистика');
+  if (!st) return h + '<div class="loading">Загружаем…</div>';
+  if (st.error) return h + '<div class="group"><div class="empty">' + esc(st.error) + '</div></div>';
+  const tile = (n, v, sub) => '<div class="tile"><div class="n">' + n + '</div><div class="v">' + n0(v) + (sub ? ' <small>' + sub + '</small>' : '') + '</div></div>';
+  h += '<div class="tiles">' + tile('Всего пользователей', st.total) + tile('Новых сегодня', st.new_today) +
+    tile('Новых за 7 дней', st.new_7d) + tile('Новых за 30 дней', st.new_30d) +
+    tile('Заходили сегодня', st.active_today) + tile('Заходили за 7 дней', st.active_7d) +
+    tile('Вернулись повторно', st.returning) + tile('Ведут дневник', st.diary_users) + '</div>';
+  const mx = Math.max(1, ...st.by_day.map(x => x.new));
+  h += '<div class="h2">Новые по дням</div><div class="group pad"><div class="sbars">' + st.by_day.map(x =>
+    '<div class="c"><span class="v">' + (x.new || '') + '</span><i class="b' + (x.new ? '' : ' z') + '" style="height:' + Math.max(3, x.new / mx * 80) + 'px"></i><span class="d">' + x.date.slice(8) + '</span></div>').join('') + '</div></div>';
+  const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 60 ? m + ' мин назад' : m < 1440 ? Math.round(m / 60) + ' ч назад' : Math.round(m / 1440) + ' дн назад'; };
+  h += '<div class="h2">Последние визиты</div><div class="group">' + (st.recent.length ? st.recent.map(u =>
+    '<div class="row"><span class="avatar" style="width:36px;height:36px">' + esc(u.name.slice(0, 1).toUpperCase()) + '</span><div class="grow"><div class="ttl">' + esc(u.name) + (u.username ? ' <span class="sub">@' + esc(u.username) + '</span>' : '') + '</div>' +
+    '<div class="sub">' + ago(u.last_seen) + ' · визитов ' + u.visits + ' · записей еды ' + u.meals + '</div></div></div>').join('') : '<div class="empty">Пока никого.</div>') + '</div>' +
+    '<p class="note">Визит — открытие приложения; повторные открытия в течение 30 минут считаются одним визитом. Эта же сводка приходит в бот по команде /stats.</p>';
+  return h;
 }
 
 /* ================= Меню ================= */
@@ -1607,6 +1832,7 @@ function renderProfile() {
   const initial = esc((userName || 'Г').slice(0, 1).toUpperCase());
   let h = '<div class="me"><div class="avatar">' + initial + (tgUser && tgUser.photo_url ? '<img src="' + esc(tgUser.photo_url) + '" alt="" onerror="this.remove()">' : '') + '</div><div><div class="nm">' + esc(userName) + '</div><div class="sub">' + esc(goalTxt) + '</div></div></div>' +
     '<div class="tiles" style="margin-top:14px"><div class="tile"><div class="n">Дневная норма</div><div class="v">' + n0(s.target_cal) + ' <small>ккал</small></div></div><div class="tile"><div class="n">Вес / цель</div><div class="v">' + n1(latestWeight()) + ' <small>/ ' + n1(s.target_weight) + ' кг</small></div></div></div>';
+  if (d.is_admin) h += '<div class="h2">Владелец</div><div class="group">' + prow('stats', 'chart', 'Статистика', 'Пользователи, визиты, активность') + '</div>';
   h += '<div class="h2">Настройки</div><div class="group">' +
     prow('goals', 'target', 'Цели и параметры', 'Рост, вес, активность, расчёт нормы') +
     prow('prefs', 'sliders', 'Оформление и приложение', 'Тема, стакан воды') + '</div>' +
@@ -1772,6 +1998,7 @@ function render() {
   else if (S.page === 'prefs') h = renderPrefs();
   else if (S.page === 'feedback') h = renderFeedback();
   else if (S.page === 'data') h = renderData();
+  else if (S.page === 'stats') h = renderStats();
   else if (S.tab === 'plan') h = renderPlan();
   else if (S.tab === 'work') h = renderWork();
   else if (S.tab === 'progress') h = renderProgress();
@@ -1780,6 +2007,7 @@ function render() {
   v.innerHTML = '<div class="wrap">' + h + '</div>';
   if (S.page === 'goals') updGfPreview();
   if (S.tab === 'diary' || S.tab === 'plan') { /* график не нужен */ } else requestAnimationFrame(drawCharts);
+  if (S.tab === 'diary' && !S.page) loadPhotos();
   if (S.d.settings.consent !== '1') { if (!S.consentOn) showConsent(); }
   else if (S.d.settings.onboarded !== '1' && !S.wiz) wizStart();
 }
@@ -1793,6 +2021,7 @@ function onInput(path) {
   if (path === 'picker.q') { searchRemote(); refreshPicker(); }
   else if (path === 'picker.g') updateAmount();
   else if (path === 'edit.g') updateEdit();
+  else if (path.startsWith('ai.items.')) { const i = +path.split('.')[2], x = S.ai.items[i], el = $('#aiK' + i); if (el) el.textContent = n0(x.cal * num(x.g) / 100) + ' ккал'; }
   else if (path.startsWith('gf.')) updGfPreview();
 }
 
@@ -1824,7 +2053,7 @@ async function act(a, t, ev) {
     case 'confirm-no': closeSheet(); break;
     case 'confirm-yes': { const r = confirmResolve; confirmResolve = null; closeSheet(); if (r) r(true); break; }
     case 'tab': S.tab = D.t; S.page = null; S.gf = null; render(); window.scrollTo(0, 0); break;
-    case 'page': S.page = D.p; if (D.p === 'goals') gfInit(); render(); window.scrollTo(0, 0); break;
+    case 'page': S.page = D.p; if (D.p === 'goals') gfInit(); if (D.p === 'stats') { loadStats(); window.scrollTo(0, 0); break; } render(); window.scrollTo(0, 0); break;
     case 'back': S.page = null; S.gf = null; render(); window.scrollTo(0, 0); break;
     case 'date-prev': S.date = addDays(S.date, -1); load(); break;
     case 'date-next': if (S.date < addDays(localDate(), 7)) { S.date = addDays(S.date, 1); load(); } break;
@@ -1846,7 +2075,7 @@ async function act(a, t, ev) {
       setSheet(mealOf(S.picker.meal).n, amountHtml()); updateAmount(); break;
     }
     case 'pk-step': { const i = $('#pkg'); S.picker.g = String(clamp(Math.round(num(S.picker.g) + +D.v), 1, 5000)); i.value = S.picker.g; updateAmount(); break; }
-    case 'pk-set': { S.picker.g = D.v; $('#pkg').value = D.v; updateAmount(); break; }
+    case 'pk-set': { S.picker.g = D.v; $('#pkg').value = D.v; $$('[data-act="pk-set"]').forEach(b => b.classList.toggle('on', b === t)); updateAmount(); break; }
     case 'pk-back': S.picker.sel = null; S.picker.manual = false; setSheet(S.picker.replace ? 'Заменить продукт' : mealOf(S.picker.meal).n, pickerHtml()); break;
     case 'pk-add': {
       const g = num(S.picker.g); if (!(g > 0 && g <= 5000)) { toast('Укажите вес от 1 до 5000 г', true); break; }
@@ -1871,6 +2100,24 @@ async function act(a, t, ev) {
       closeSheet(); run(() => post('/api/update_meal', body), 'Сохранено'); break;
     }
     case 'ed-del': { const id = S.edit.id; closeSheet(); run(() => post('/api/delete_meal', { id }), 'Удалено'); break; }
+    case 'photo-del': {
+      const id = S.edit.id; closeSheet();
+      try { await post('/api/meal_photo_delete', { id }); } catch (e) { toast(e.message, true); break; }
+      delete PHOTO[id]; const m = S.d.day_meals.find(x => x.id === id); if (m) m.photo = false; render(); toast('Фото убрано'); break;
+    }
+    case 'ai-toggle': { const x = S.ai.items[+D.i]; x.on = !x.on; t.classList.toggle('on', x.on); break; }
+    case 'ai-add': {
+      const items = S.ai.items.filter(x => x.on && num(x.g) > 0);
+      if (!items.length) { toast('Отметьте хотя бы одно блюдо', true); break; }
+      const sid = sheetSeq; let ok = 0;
+      for (const x of items) {
+        const k = num(x.g) / 100;
+        try { await post('/api/add_meal', { date: S.date, meal_type: S.picker.meal, name: x.name, grams: num(x.g), cal: +(x.cal * k).toFixed(1), p: +(x.p * k).toFixed(1), f: +(x.f * k).toFixed(1), c: +(x.c * k).toFixed(1) }); ok++; }
+        catch (e) { toast(e.message, true); break; }
+      }
+      if (ok) { closeIf(sid); await load(); toast('Добавлено блюд: ' + ok); }
+      break;
+    }
     case 'ed-replace': { const e = S.edit; S.edit = null; openPicker(e.type, e.id); break; }
     case 'copy-prev': {
       if (S.d.day_meals.length && !await askConfirm('Добавить блюда?', 'В этом дне уже есть записи. Блюда предыдущего дня добавятся к ним.', 'Добавить')) break;
@@ -2039,6 +2286,8 @@ document.addEventListener('change', e => {
   const t = e.target, p = t.dataset && t.dataset.ch; if (!p) return;
   if (p === 'dateSel') { if (t.value) { S.date = t.value; load(); } return; }
   if (p === 'import') { importFile(t); return; }
+  if (p === 'mealPhoto') { uploadMealPhoto(t); return; }
+  if (p === 'aiPhoto') { recognizePhoto(t); return; }
   setPath(p, t.value);
   if (p === 'exSel') { S.exHist = null; render(); }
   else if (p === 'form.ex') { const l = S.d.last_sets[t.value]; if (l && !S.form.w && !S.form.r) { S.form.w = String(l.weight); S.form.r = String(l.reps); } render(); }
@@ -2215,6 +2464,7 @@ def handle_post(cur, user_id, path, data):
             raise ValueError("confirmation required")
         for table in USER_TABLES:
             cur.execute(f"DELETE FROM {table} WHERE telegram_id = %s", (user_id,))
+        extras.delete_user(cur, user_id)
         return {}
 
     if path == "/api/add_custom_food":
@@ -2361,7 +2611,16 @@ def handle_post(cur, user_id, path, data):
             cur.execute(
                 "DELETE FROM meal_log WHERE id = %s AND telegram_id = %s", (int(data["id"]), user_id)
             )
+            extras.delete_meal_photo(cur, user_id, int(data["id"]))
             sync_daily_calories(cur, user_id, row[0])
+        return {}
+
+    if path == "/api/meal_photo":
+        extras.save_meal_photo(cur, user_id, int(data["id"]), data["image"])
+        return {}
+
+    if path == "/api/meal_photo_delete":
+        extras.delete_meal_photo(cur, user_id, int(data["id"]))
         return {}
 
     if path == "/api/clear_day_meals":
@@ -2467,7 +2726,7 @@ DB_UNAVAILABLE = (psycopg.OperationalError, PoolTimeout)
 BAD_INPUT = (KeyError, ValueError, TypeError, IndexError, psycopg.DataError)
 
 GET_PATHS = ("/api/state", "/api/export_backup", "/api/exercise_history", "/api/foods_search",
-             "/api/foods_chains")
+             "/api/foods_chains", "/api/admin_stats", "/api/meal_photo")
 
 
 def notify_admin(user_id, kind, text):
@@ -2573,6 +2832,26 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"items": food_db.search(POOL, q, brand)})
             elif path == "/api/foods_chains":
                 self._send_json({"items": food_db.chains(POOL)})
+            elif path == "/api/admin_stats":
+                if not extras.is_admin(user_id):
+                    self._send_json({"error": "not found"}, 404)
+                    return
+                with POOL.connection() as conn:
+                    with conn.cursor() as cur:
+                        self._send_json(extras.stats(cur))
+            elif path == "/api/meal_photo":
+                with POOL.connection() as conn:
+                    with conn.cursor() as cur:
+                        img = extras.get_meal_photo(cur, user_id, int(qs.get("id", ["0"])[0]))
+                if not img:
+                    self._send_json({"error": "not found"}, 404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Cache-Control", "private, max-age=86400")
+                self.send_header("Content-Length", str(len(img)))
+                self.end_headers()
+                self.wfile.write(img)
             else:
                 self._api_export(user_id)
         except Exception as exc:
@@ -2609,6 +2888,14 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
 
         with POOL.connection() as conn:
             with conn.cursor() as cur:
+                try:  # extras: учёт визитов не должен ломать загрузку приложения
+                    cur.execute("SAVEPOINT touch_user")
+                    fname, uname = extras.user_info_from_init(self.headers.get("X-Telegram-Init-Data", ""))
+                    extras.touch_user(cur, user_id, fname, uname)
+                    cur.execute("RELEASE SAVEPOINT touch_user")
+                except Exception as exc:
+                    cur.execute("ROLLBACK TO SAVEPOINT touch_user")
+                    print("Учёт визита не записан:", repr(exc), flush=True)
                 settings = get_user_settings(cur, user_id)
 
                 cur.execute(
@@ -2634,6 +2921,9 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
                      "p": r[5] or 0, "f": r[6] or 0, "c": r[7] or 0}
                     for r in cur.fetchall()
                 ]
+                with_photo = extras.photo_ids(cur, user_id, [m["id"] for m in day_meals])
+                for m in day_meals:
+                    m["photo"] = m["id"] in with_photo
 
                 cur.execute(
                     """SELECT id, workout_name, duration_min, calories_burned
@@ -2723,6 +3013,8 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
         self._send_json(
             {
                 "version": APP_VERSION,
+                "is_admin": extras.is_admin(user_id),
+                "features": extras.features(),
                 "contact": PRIVACY_CONTACT,
                 "settings": settings,
                 "water_ml": water_ml,
@@ -2793,10 +3085,16 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
         )
 
     def do_POST(self):
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/tg/webhook":  # extras: сообщения боту (/start, /stats)
+            self._tg_webhook()
+            return
         user_id = self._get_uid()
         if user_id is None:
             return
-        path = urllib.parse.urlparse(self.path).path
+        if path == "/api/recognize":  # extras: распознавание еды по фото (долгий запрос, вне транзакции)
+            self._api_recognize(user_id)
+            return
 
         try:
             length = int(self.headers.get("Content-Length", 0))
@@ -2837,6 +3135,55 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/add_feedback":
             notify_admin(user_id, str(data.get("kind", "idea")), str(data.get("text", "")).strip())
 
+    def _read_json(self):
+        length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_BODY:
+            raise ValueError("too large")
+        raw = self.rfile.read(length).decode("utf-8") if length else ""
+        data = json.loads(raw) if raw else {}
+        if not isinstance(data, dict):
+            raise ValueError("body must be an object")
+        return data
+
+    def _tg_webhook(self):
+        if not extras.check_webhook_secret(self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")):
+            self._send_json({"error": "forbidden"}, 403)
+            return
+        try:
+            update = self._read_json()
+        except (ValueError, UnicodeDecodeError):
+            self._send_json({"ok": True})
+            return
+        self._send_json({"ok": True})  # Telegram ждёт быстрый ответ, команду выполняем в фоне
+
+        def work():
+            try:
+                extras.handle_update(POOL, update)
+            except Exception as exc:
+                print("Бот: ошибка обработки:", type(exc).__name__, flush=True)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _api_recognize(self, user_id):
+        try:
+            data = self._read_json()
+            result = extras.recognize(POOL, user_id, data.get("image"))
+        except extras.AiLimit:
+            self._send_json({"error": f"На сегодня лимит распознаваний исчерпан ({extras.AI_DAILY_LIMIT} в сутки)."}, 429)
+            return
+        except extras.AiError as exc:
+            self._send_json({"error": str(exc)}, 502)
+            return
+        except (ValueError, UnicodeDecodeError, TypeError):
+            self._send_json({"error": "Не удалось прочитать фото. Попробуйте другое."}, 400)
+            return
+        except Exception as exc:
+            self._fail(exc, "POST /api/recognize")
+            return
+        out = {"ok": True}
+        out.update(result)
+        self._send_json(out)
+
     def log_message(self, format, *args):
         pass
 
@@ -2848,6 +3195,10 @@ if __name__ == "__main__":
         food_db.setup(POOL)  # база продуктов: таблицы + меню сетей, обновление раз в сутки
     except Exception as exc:
         print("База продуктов не запустилась:", repr(exc), flush=True)
+    try:
+        extras.init(POOL)  # extras: учёт пользователей, фото, распознавание, бот
+    except Exception as exc:
+        print("Дополнения не запустились:", repr(exc), flush=True)
     if not BOT_TOKEN:
         print(
             "ВНИМАНИЕ: BOT_TOKEN не задан — подпись Telegram не проверяется (режим разработки). "
