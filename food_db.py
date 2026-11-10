@@ -11,6 +11,7 @@ Open Food Facts и сохраняет найденное. Меню сетей б
 и перечитывается раз в сутки (позиции, удалённые из файла, пропадают из поиска).
 """
 import glob
+import html
 import json
 import os
 import re
@@ -54,7 +55,16 @@ SCHEMA = [
         q TEXT PRIMARY KEY,
         fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )""",
+    """CREATE TABLE IF NOT EXISTS foods_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )""",
 ]
+
+# Пакет продуктов, заранее скачанный из Open Food Facts (лежит рядом с server.py)
+PRODUCTS_FILES = ("products_ru.json.gz", "products_ru.json")
+OFF_BACKOFF_SEC = 600    # если Open Food Facts ответил ошибкой — не дёргаем его 10 минут
+_off_down_until = 0.0
 
 # Народные названия сетей -> как сеть записана в базе
 BRAND_ALIASES = {
@@ -120,14 +130,31 @@ def _r1(v):
     return None if v is None else round(float(v), 1)
 
 
-def load_restaurants(pool):
-    total = 0
-    for path in sorted(glob.glob(os.path.join(RESTAURANTS_DIR, "*.json"))):
-        if os.path.basename(path).startswith("_"):
+def _menu_files():
+    """Файлы меню: из папки restaurants/ и (если загружены без папки) рядом с server.py."""
+    paths, seen = [], set()
+    for path in sorted(glob.glob(os.path.join(RESTAURANTS_DIR, "*.json"))) + \
+            sorted(glob.glob(os.path.join(HERE, "*.json"))):
+        name = os.path.basename(path)
+        if name.startswith("_") or name in seen:
             continue
         try:
             with open(path, encoding="utf-8") as fh:
                 data = json.load(fh)
+        except Exception:
+            continue
+        if isinstance(data, dict) and data.get("chain") and isinstance(data.get("items"), list):
+            seen.add(name)
+            paths.append((path, data))
+    if not paths:
+        print("Меню сетей: файлы не найдены (ожидаются rostics.json и др.)", flush=True)
+    return paths
+
+
+def load_restaurants(pool):
+    total = 0
+    for path, data in _menu_files():
+        try:
             chain = data["chain"]
             foods, ids = [], []
             for it in data["items"]:
@@ -173,13 +200,22 @@ def _parse_off(p):
     kcal = _num(n.get("energy-kcal_100g"))
     if kcal is None and _num(n.get("energy_100g")) is not None:
         kcal = round(_num(n.get("energy_100g")) / 4.184, 1)
-    name = (p.get("product_name_ru") or p.get("product_name") or "").strip()
+    pfc = [_num(n.get(k)) for k in ("proteins_100g", "fat_100g", "carbohydrates_100g")]
+    if kcal is None and None not in pfc:  # калорий нет, но есть БЖУ — считаем 4/9/4
+        kcal = round(pfc[0] * 4 + pfc[1] * 9 + pfc[2] * 4, 1)
+    if any(v is not None and not (0 <= v <= 100) for v in pfc):
+        return None
+    name = html.unescape(str(p.get("product_name_ru") or p.get("product_name") or ""))
+    name = re.sub(r"\s+", " ", name).strip()
     code = str(p.get("code") or "").strip()
     if not name or not code or kcal is None or kcal > 950:
         return None
     if not re.search(r"[а-яА-ЯёЁ]", name):  # в приложении на русском — берём русские названия
         return None
-    brand = (p.get("brands") or "").split(",")[0].strip() or None
+    brands = p.get("brands") or ""
+    if isinstance(brands, list):
+        brands = brands[0] if brands else ""
+    brand = html.unescape(str(brands).split(",")[0]).strip() or None
     return {"source": "off", "source_id": code, "barcode": code, "name": name[:100],
             "brand": brand[:80] if brand else None, "kcal": kcal,
             "protein": _num(n.get("proteins_100g")), "fat": _num(n.get("fat_100g")),
@@ -209,7 +245,7 @@ def _off_get(params):
             host + "/cgi/search.pl?" + urllib.parse.urlencode(params),
             headers={"User-Agent": OFF_UA, "Accept": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=10) as r:
+            with urllib.request.urlopen(req, timeout=5) as r:
                 return json.load(r)
         except urllib.error.HTTPError as exc:
             body = ""
@@ -219,13 +255,50 @@ def _off_get(params):
                 pass
             last = f"HTTP {exc.code} {exc.reason} от {host}: {body[:150]}"
             if exc.code in (429, 502, 503, 504) and attempt == 0:
-                time.sleep(1.5)
+                time.sleep(1.0)
         except Exception as exc:
             last = f"{type(exc).__name__} от {host}: {exc}"
     raise RuntimeError(last)
 
 
+SAL_URL = "https://search.openfoodfacts.org/search"
+
+
+def _sal_search(q):
+    """Новый поиск Open Food Facts (search-a-licious): быстрый, понимает русский."""
+    url = SAL_URL + "?" + urllib.parse.urlencode(
+        {"q": q, "langs": "ru", "page_size": 50, "fields": OFF_FIELDS})
+    req = urllib.request.Request(url, headers={"User-Agent": OFF_UA, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return json.load(r).get("hits") or []
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"HTTP {exc.code} {exc.reason} от search.openfoodfacts.org")
+    except Exception as exc:
+        raise RuntimeError(f"{type(exc).__name__} от search.openfoodfacts.org: {exc}")
+
+
 def off_search(q):
+    errors = []
+    try:
+        hits = _sal_search(q)
+        out, seen = [], set()
+        for p in hits:
+            f = _parse_off(p)
+            if f and f["source_id"] not in seen:
+                seen.add(f["source_id"])
+                out.append(f)
+        return out
+    except Exception as exc:
+        errors.append(str(exc))
+    try:
+        return _cgi_search(q)
+    except Exception as exc:
+        errors.append(str(exc))
+    raise RuntimeError("; ".join(errors))
+
+
+def _cgi_search(q):
     params = {"search_terms": q, "search_simple": 1, "action": "process", "json": 1,
               "page_size": 40, "fields": OFF_FIELDS, "lc": "ru",
               "tagtype_0": "countries", "tag_contains_0": "contains", "tag_0": "russia"}
@@ -244,12 +317,14 @@ def _fetch_off_if_needed(pool, q):
         row = conn.execute(
             "SELECT 1 FROM foods_queries WHERE q = %s AND fetched_at > now() - make_interval(days => %s)",
             (q, QUERY_TTL_DAYS)).fetchone()
-    if row or not _off_allowed():
+    global _off_down_until
+    if row or time.time() < _off_down_until or not _off_allowed():
         return False
     try:
         foods = off_search(q)
     except Exception as exc:
-        print("Open Food Facts недоступен:", exc, flush=True)
+        _off_down_until = time.time() + OFF_BACKOFF_SEC
+        print("Open Food Facts недоступен (пауза 10 мин):", exc, flush=True)
         return False
     with pool.connection() as conn:
         with conn.cursor() as cur:
@@ -257,6 +332,55 @@ def _fetch_off_if_needed(pool, q):
             cur.execute("INSERT INTO foods_queries (q) VALUES (%s) "
                         "ON CONFLICT (q) DO UPDATE SET fetched_at = now()", (q,))
     return bool(foods)
+
+
+# ---------------------------------------------------------------- пакет продуктов
+
+BULK_SQL = """
+INSERT INTO foods (source, source_id, name, brand, kcal, protein, fat, carbs, serving_g,
+                   barcode, status, updated_at)
+SELECT 'off', t.c, t.n, NULLIF(t.b, ''), t.k, t.p, t.f, t.cb, t.s, t.c, 'approved', now()
+FROM unnest(%s::text[], %s::text[], %s::text[], %s::float8[], %s::float8[], %s::float8[],
+            %s::float8[], %s::float8[]) AS t(c, n, b, k, p, f, cb, s)
+ON CONFLICT (source, source_id) DO UPDATE SET
+    name = EXCLUDED.name, brand = EXCLUDED.brand, kcal = EXCLUDED.kcal,
+    protein = EXCLUDED.protein, fat = EXCLUDED.fat, carbs = EXCLUDED.carbs,
+    serving_g = EXCLUDED.serving_g, barcode = EXCLUDED.barcode, status = 'approved',
+    updated_at = now()
+"""
+
+
+def load_products_pack(pool):
+    """Заливает products_ru.json(.gz) в таблицу foods. Повторно — только если файл изменился."""
+    import gzip
+    import hashlib
+    path = next((os.path.join(HERE, n) for n in PRODUCTS_FILES
+                 if os.path.exists(os.path.join(HERE, n))), None)
+    if not path:
+        return 0
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    digest = hashlib.sha256(raw).hexdigest()
+    with pool.connection() as conn:
+        row = conn.execute("SELECT value FROM foods_meta WHERE key = 'products_pack'").fetchone()
+    if row and row[0] == digest:
+        print("Пакет продуктов: без изменений, загрузка не нужна", flush=True)
+        return 0
+    data = json.loads(gzip.decompress(raw) if path.endswith(".gz") else raw)
+    items = [it for it in data["items"] if it and it[0] and it[1] and it[3] is not None]
+    for i in range(0, len(items), 2000):
+        chunk = items[i:i + 2000]
+        cols = list(zip(*chunk))
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(BULK_SQL, [list(cols[0]), list(cols[1]), [b or "" for b in cols[2]],
+                                       list(cols[3]), list(cols[4]), list(cols[5]),
+                                       list(cols[6]), list(cols[7])])
+    with pool.connection() as conn:
+        conn.execute("INSERT INTO foods_meta (key, value) VALUES ('products_pack', %s) "
+                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (digest,))
+    print(f"Пакет продуктов: загружено {len(items)}", flush=True)
+    return len(items)
 
 
 # ---------------------------------------------------------------- поиск
@@ -325,6 +449,10 @@ def setup(pool):
     _started = True
 
     def loop():
+        try:
+            load_products_pack(pool)
+        except Exception as exc:
+            print("Пакет продуктов не загрузился:", repr(exc), flush=True)
         while True:
             try:
                 load_restaurants(pool)
