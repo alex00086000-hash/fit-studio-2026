@@ -16,6 +16,7 @@ import os
 import re
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -197,14 +198,38 @@ def _off_allowed():
         return True
 
 
+OFF_HOSTS = ("https://world.openfoodfacts.org", "https://ru.openfoodfacts.org")
+
+
+def _off_get(params):
+    """Запрос к Open Food Facts: два адреса, повтор при перегрузке, понятная ошибка в логе."""
+    last = "нет ответа"
+    for attempt, host in enumerate(OFF_HOSTS):
+        req = urllib.request.Request(
+            host + "/cgi/search.pl?" + urllib.parse.urlencode(params),
+            headers={"User-Agent": OFF_UA, "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read(200).decode("utf-8", "replace").replace("\n", " ")
+            except Exception:
+                pass
+            last = f"HTTP {exc.code} {exc.reason} от {host}: {body[:150]}"
+            if exc.code in (429, 502, 503, 504) and attempt == 0:
+                time.sleep(1.5)
+        except Exception as exc:
+            last = f"{type(exc).__name__} от {host}: {exc}"
+    raise RuntimeError(last)
+
+
 def off_search(q):
     params = {"search_terms": q, "search_simple": 1, "action": "process", "json": 1,
               "page_size": 40, "fields": OFF_FIELDS, "lc": "ru",
               "tagtype_0": "countries", "tag_contains_0": "contains", "tag_0": "russia"}
-    req = urllib.request.Request(OFF_SEARCH + "?" + urllib.parse.urlencode(params),
-                                 headers={"User-Agent": OFF_UA})
-    with urllib.request.urlopen(req, timeout=8) as r:
-        data = json.load(r)
+    data = _off_get(params)
     out, seen = [], set()
     for p in data.get("products", []):
         f = _parse_off(p)
@@ -224,7 +249,7 @@ def _fetch_off_if_needed(pool, q):
     try:
         foods = off_search(q)
     except Exception as exc:
-        print("Open Food Facts недоступен:", type(exc).__name__, flush=True)
+        print("Open Food Facts недоступен:", exc, flush=True)
         return False
     with pool.connection() as conn:
         with conn.cursor() as cur:
