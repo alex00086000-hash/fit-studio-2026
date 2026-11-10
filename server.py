@@ -17,6 +17,7 @@ from psycopg_pool import ConnectionPool, PoolTimeout
 
 import extras
 import food_db
+import menu_data
 
 APP_VERSION = "1.1"
 PORT = int(os.environ.get("PORT", 8000))
@@ -298,6 +299,8 @@ DEFAULT_PROGRAMS = [
 PROGRAM_IDS = {p["id"] for p in DEFAULT_PROGRAMS}
 PROGRAM_EXERCISES = {e["name"] for p in DEFAULT_PROGRAMS for d in p["days"] for e in d["exercises"]}
 ALL_DEFAULT_EXERCISES = sorted(set(DEFAULT_EXERCISES) | PROGRAM_EXERCISES)
+
+DEFAULT_FOODS += [f for f in menu_data.EXTRA_FOODS if f[0] not in {x[0] for x in DEFAULT_FOODS}]
 
 SIDE_NAMES = ["Яблоко свежее", "Банан", "Огурцы свежие", "Помидоры свежие", "Хлеб цельнозерновой"]
 
@@ -655,23 +658,25 @@ WEB_APP_HTML = r"""<!DOCTYPE html>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root {
-  --bg: #F2F2F7; --surface: #FFFFFF; --surface-2: #F2F2F7; --line: #E5E5EA;
-  --ink: #1C1C1E; --ink-2: #48484A; --ink-3: #8E8E93;
-  --accent: #19A463; --accent-ink: #FFFFFF; --accent-soft: #E3F5EB;
-  --prot: #FF6B57; --fat: #F5A524; --carb: #4D8BFF; --water: #2FA8E0;
+  --bg: #F2F4F7; --surface: #FFFFFF; --surface-2: #F2F4F7; --line: #E6E8EC;
+  --ink: #101828; --ink-2: #475467; --ink-3: #98A2B3;
+  --accent: #22C08A; --accent-ink: #FFFFFF; --accent-soft: #E3F8EF;
+  --prot: #FF7A6B; --fat: #FFA43A; --carb: #3D8BFF; --water: #36B5F0;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 20px rgba(16, 24, 40, .05);
   --danger: #FF3B30; --danger-soft: #FFE5E3;
   --s1: #FFAD33; --s2: #2FBF71; --s3: #7B7BFF; --s4: #FF6FA8;
   --s1-soft: #FFF3E0; --s2-soft: #E2F7EB; --s3-soft: #ECECFF; --s4-soft: #FFE8F1;
-  --ring-track: #ECECF1;
-  --overlay: rgba(0, 0, 0, 0.38);
-  --blur-bg: rgba(249, 249, 251, 0.82);
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --ring-track: #EDF0F3;
+  --overlay: rgba(16, 24, 40, 0.38);
+  --blur-bg: rgba(242, 244, 247, 0.88);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans", sans-serif;
   --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 :root[data-theme="dark"] {
   --bg: #000000; --surface: #1C1C1E; --surface-2: #2C2C2E; --line: #38383A;
   --ink: #F2F2F7; --ink-2: #C7C7CC; --ink-3: #8E8E93;
-  --accent: #32D27A; --accent-ink: #052012; --accent-soft: #15301F;
+  --accent: #34D399; --accent-ink: #04241A; --accent-soft: #123026;
+  --shadow: none;
   --prot: #FF7F6B; --fat: #FFB547; --carb: #6EA2FF; --water: #5AC8FA;
   --danger: #FF5A50; --danger-soft: #3A1A18;
   --s1: #FFB547; --s2: #32D27A; --s3: #8E8EFF; --s4: #FF7EB3;
@@ -696,7 +701,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, label:focus-wit
 .top { position: sticky; top: 0; z-index: 20; background: var(--blur-bg); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
 .top .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 54px; }
 .streak { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 11px 0 8px; border-radius: 15px; background: var(--surface); font: 600 14px var(--round); }
-.streak .i { width: 17px; height: 17px; color: var(--fat); fill: var(--fat); fill-opacity: .18; }
+.streak { box-shadow: var(--shadow); }
+.streak .i { width: 17px; height: 17px; color: var(--fat); fill: var(--fat); fill-opacity: .25; transform-origin: 50% 80%; }
+.streak.live .i { animation: flame 1.8s ease-in-out infinite; }
+@keyframes flame { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255, 164, 58, 0)); } 50% { transform: scale(1.16); filter: drop-shadow(0 0 5px rgba(255, 164, 58, .65)); } }
+/* появление карточек при прокрутке */
+.rise { opacity: 0; transform: translateY(14px); }
+.rise.in { opacity: 1; transform: none; transition: opacity .25s ease-out, transform .25s ease-out; }
 .top-title { font-weight: 600; font-size: 17px; text-align: center; }
 .datenav { display: flex; align-items: center; gap: 0; }
 .datenav .nav { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 17px; color: var(--accent); }
@@ -709,9 +720,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, label:focus-wit
 /* общие блоки */
 .tab { display: none; padding-top: 4px; }
 .tab.active { display: block; }
-.h2 { margin: 26px 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.h2 { margin: 28px 4px 12px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .h2 small { font-size: 14px; font-weight: 400; color: var(--ink-3); letter-spacing: 0; }
-.group { background: var(--surface); border-radius: 18px; overflow: hidden; }
+.group { background: var(--surface); border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); }
 .pad { padding: 16px; }
 .row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; width: 100%; text-align: left; }
 .group > .row + .row::before, .group > * + .row::before, .group > .row + *::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--line); }
@@ -781,7 +792,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .bar > i { display: block; height: 100%; border-radius: 3px; transition: width .6s cubic-bezier(.3, .7, .2, 1); }
 
 /* главный экран: кольцо калорий */
-.hero { background: var(--surface); border-radius: 28px; padding: 20px 18px 18px; }
+.hero { background: var(--surface); border-radius: 24px; padding: 22px 20px 20px; margin-top: 4px; box-shadow: var(--shadow); }
 .ringrow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
 .side { text-align: center; }
 .side .v { font: 600 22px/1.1 var(--round); letter-spacing: -0.02em; }
@@ -789,37 +800,43 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .side .n .i { width: 14px; height: 14px; }
 .ring { position: relative; width: 172px; height: 172px; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
-.ring circle { fill: none; stroke-width: 16; stroke-linecap: round; }
+.ring circle { fill: none; stroke-width: 14; stroke-linecap: round; }
 .ring .trk { stroke: var(--ring-track); }
-.ring .val { stroke: var(--accent); transition: stroke-dashoffset .9s cubic-bezier(.3, .7, .2, 1); }
+.ring .val { stroke: var(--accent); transition: stroke-dashoffset 1.1s cubic-bezier(.22, .8, .24, 1), stroke .3s; }
 .ring.over .val { stroke: var(--danger); }
 .ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .ring .big { font: 700 42px/1 var(--round); letter-spacing: -0.035em; }
 .ring.over .big { color: var(--danger); }
 .ring .cap { margin-top: 5px; font-size: 13px; color: var(--ink-3); }
-.macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 22px; }
 .macro .n { font-size: 13px; color: var(--ink-2); font-weight: 500; display: flex; align-items: center; gap: 5px; }
 .macro .n::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mc); }
 .macro .v { margin: 3px 0 7px; font: 600 17px var(--round); }
 .macro .v small { font: 400 13px var(--font); color: var(--ink-3); }
-.macro .bar { height: 7px; }
+.macro .bar { height: 5px; border-radius: 3px; }
 .macro .bar > i { background: var(--mc); }
 .budget, .legend, .facts { display: none; }
 
 /* приёмы пищи */
-.meal { margin-top: 12px; background: var(--surface); border-radius: 22px; overflow: hidden; }
-.meal-h { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 16px; }
-.meal-h .emo { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; flex: none; background: var(--mc-soft); }
+.meal { margin-top: 16px; background: var(--surface); border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); }
+.meal-h { display: flex; align-items: center; gap: 14px; padding: 16px 16px 16px 16px; }
+.meal-h .emo { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; flex: none; background: var(--mc-soft); }
 .meal-h .t { font-weight: 600; font-size: 17px; }
 .meal-h .k { font-size: 13px; color: var(--ink-3); margin-top: 1px; }
 .meal-h .k b { color: var(--ink); font-weight: 600; font-family: var(--round); }
-.meal-h .add { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--mc-soft); color: var(--mc); }
-.meal-h .add .i { stroke-width: 2.4; width: 20px; height: 20px; }
-.meal-h .add:active { transform: scale(.9); }
-.meal .mbar { height: 3px; margin: -4px 16px 10px 72px; border-radius: 2px; background: var(--ring-track); overflow: hidden; }
+.meal-h .kc { text-align: right; margin-left: auto; line-height: 1.1; }
+.meal-h .kc b { display: block; font: 700 19px var(--round); letter-spacing: -0.02em; }
+.meal-h .kc span { font-size: 12px; color: var(--ink-3); }
+.meal-h .add { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; flex: none; transition: transform .14s cubic-bezier(.3, .7, .4, 1.4), box-shadow .2s; box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+.meal-h .add .i { stroke-width: 2.6; width: 20px; height: 20px; }
+.meal-h .add:active { transform: scale(.95); }
+.btn:active, .chip:active, .ai-btn:active { transform: scale(.97); }
+.chip, .ai-btn { transition: transform .14s ease; }
+.meal .mbar { height: 4px; margin: -6px 16px 12px 78px; border-radius: 2px; background: var(--ring-track); overflow: hidden; }
 .meal .mbar i { display: block; height: 100%; background: var(--mc); border-radius: 2px; }
-.meal .row { padding: 8px 16px; min-height: 60px; }
-.meal .row::before { content: ""; position: absolute; top: 0; left: 72px; right: 0; border-top: 0.5px solid var(--line); }
+.meal .row { padding: 10px 16px; min-height: 64px; gap: 14px; }
+.meal .row .thumb { width: 48px; height: 48px; border-radius: 12px; }
+.meal .row::before { content: ""; position: absolute; top: 0; left: 78px; right: 0; border-top: 0.5px solid var(--line); }
 .meal .mbar + .row::before { display: none; }
 .mac { display: inline-flex; gap: 8px; }
 .mac span { display: inline-flex; gap: 3px; }
@@ -839,7 +856,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .water .btn .i { width: 16px; height: 16px; stroke-width: 2.4; }
 
 /* нижнее меню */
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--blur-bg); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .tabbar .wrap { display: grid; grid-template-columns: repeat(5, 1fr); padding: 0 4px; }
 .tabbar button { position: relative; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink-3); font-size: 10.5px; font-weight: 500; }
 .tabbar button .i { width: 25px; height: 25px; stroke-width: 1.7; }
@@ -879,7 +896,7 @@ canvas.chart { width: 100%; height: 200px; display: block; }
 .cal-bars .col.cur .d { color: var(--ink); font-weight: 700; }
 .cal-line { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink-3); pointer-events: none; opacity: .6; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.tile { background: var(--surface); border-radius: 18px; padding: 14px 16px; }
+.tile { background: var(--surface); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
 .tile .n { font-size: 13px; color: var(--ink-3); font-weight: 500; }
 .tile .v { font: 700 26px var(--round); letter-spacing: -0.03em; margin-top: 2px; }
 .tile .v small { font: 400 14px var(--font); color: var(--ink-3); letter-spacing: 0; }
@@ -909,7 +926,7 @@ canvas.chart { width: 100%; height: 200px; display: block; }
 .opt.on { border-color: var(--accent); background: var(--accent-soft); }
 .opt .ttl { font-size: 17px; }
 .loading { padding: 80px 20px; text-align: center; color: var(--ink-3); font-weight: 500; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } .rise { opacity: 1; transform: none; } }
 
 .stepper { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; }
 .stepper input { text-align: center; font: 600 22px var(--round); height: 52px; }
@@ -1194,7 +1211,7 @@ function latestWeight() {
 }
 
 /* ================= Дневник ================= */
-const CATS = [['all', 'Все'], ['meat', 'Мясо'], ['fish', 'Рыба'], ['dairy', 'Молочные и яйца'], ['grains', 'Крупы и хлеб'], ['veg', 'Овощи'], ['fruit', 'Фрукты'], ['other', 'Другое']];
+const CATS = [['all', 'Все'], ['dishes', 'Блюда'], ['cafe', 'Кафе'], ['meat', 'Мясо'], ['fish', 'Рыба'], ['dairy', 'Молочные и яйца'], ['grains', 'Крупы и хлеб'], ['veg', 'Овощи'], ['fruit', 'Фрукты'], ['other', 'Другое']];
 const mealOf = k => MEALS.find(m => m.k === k) || MEALS[3];
 const macLine = (p, f, c) => '<span class="mac"><span class="p">Б <b>' + n0(p) + '</b></span><span class="f">Ж <b>' + n0(f) + '</b></span><span class="c">У <b>' + n0(c) + '</b></span></span>';
 
@@ -1245,6 +1262,27 @@ async function loadPhotos() {
     } catch (e) {}
   }
 }
+/* Анимации главного экрана: кольцо дорисовывается, карточки появляются при прокрутке (один раз). */
+const SEEN = new Set();
+let riseObs = null;
+function animateDiary() {
+  const ring = $('#ringVal');
+  if (ring) requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.strokeDashoffset = ring.dataset.to + 'px'; }));
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!riseObs && 'IntersectionObserver' in window) {
+    riseObs = new IntersectionObserver(es => es.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target, i = +el.dataset.i || 0;
+      setTimeout(() => el.classList.add('in'), Math.min(i, 4) * 60);
+      SEEN.add(el.dataset.anim); riseObs.unobserve(el);
+    }), { threshold: 0.12 });
+  }
+  $$('.rise').forEach((el, i) => {
+    if (reduce || !riseObs || SEEN.has(el.dataset.anim)) { el.classList.add('in'); el.style.transition = 'none'; return; }
+    el.dataset.i = i; riseObs.observe(el);
+  });
+}
+
 /* Сжатие фото на телефоне перед отправкой. */
 function shrinkPhoto(file, maxSide, quality) {
   return new Promise((resolve, reject) => {
@@ -1268,10 +1306,13 @@ function mealsByType() {
   return out;
 }
 
+const RING = { frac: 0, key: '' };
 function ringHtml(left, budget, eaten, over) {
-  const r = 76, len = 2 * Math.PI * r, frac = clamp(budget ? eaten / budget : 0, 0, 1);
+  const r = 76, len = 2 * Math.PI * r, frac = over ? 1 : clamp(budget ? eaten / budget : 0, 0, 1);
+  if (RING.key !== S.date) { RING.key = S.date; RING.frac = 0; }  // новый день — заполняем с нуля
+  const from = RING.frac; RING.frac = frac; RING.len = len;
   return '<div class="ring' + (over ? ' over' : '') + '"><svg viewBox="0 0 184 184" aria-hidden="true"><circle class="trk" cx="92" cy="92" r="' + r + '"/>' +
-    '<circle class="val" cx="92" cy="92" r="' + r + '" stroke-dasharray="' + len.toFixed(1) + '" stroke-dashoffset="' + (len * (1 - (over ? 1 : frac))).toFixed(1) + '"/></svg>' +
+    '<circle class="val" id="ringVal" cx="92" cy="92" r="' + r + '" stroke-dasharray="' + len.toFixed(1) + '" stroke-dashoffset="' + (len * (1 - from)).toFixed(1) + '" data-to="' + (len * (1 - frac)).toFixed(1) + '"/></svg>' +
     '<div class="mid"><div class="big">' + n0(Math.abs(left)) + '</div><div class="cap">' + (left >= 0 ? 'ккал осталось' : 'ккал сверх нормы') + '</div></div></div>';
 }
 
@@ -1280,7 +1321,7 @@ function renderDiary() {
   const burn = d.today_burn, budget = s.target_cal + burn, eaten = d.today_cal;
   const left = budget - eaten, over = left < -budget * 0.05;
   const sums = MEALS.map(m => by[m.k].reduce((a, x) => a + x.calories, 0));
-  let h = '<section class="hero" aria-label="Калории за день"><div class="ringrow">' +
+  let h = '<section class="hero rise" data-anim="hero" aria-label="Калории за день"><div class="ringrow">' +
     '<div class="side"><div class="v">' + n0(eaten) + '</div><div class="n">' + ic('fork') + 'съедено</div></div>' +
     ringHtml(left, budget, eaten, over) +
     '<div class="side"><div class="v">' + n0(burn) + '</div><div class="n">' + ic('flame') + 'сожжено</div></div></div>' +
@@ -1295,8 +1336,11 @@ function renderDiary() {
   }
   MEALS.forEach((m, i) => {
     const list = by[m.k], tgt = Math.round(s.target_cal * m.pct / 100);
-    h += '<section class="meal" style="--mc:var(--' + m.c + ');--mc-soft:var(--' + m.c + '-soft)"><div class="meal-h"><span class="emo" aria-hidden="true">' + m.e + '</span>' +
-      '<div class="grow"><div class="t">' + m.n + '</div><div class="k"><b>' + n0(sums[i]) + '</b> из ' + n0(tgt) + ' ккал</div></div>' +
+    const grams = list.reduce((a, x) => a + x.grams, 0);
+    const info = list.length ? n0(grams) + ' г · ' + list.length + ' ' + plural(list.length, 'продукт', 'продукта', 'продуктов') : 'Рекомендуем ~' + n0(tgt) + ' ккал';
+    h += '<section class="meal rise" data-anim="meal-' + m.k + '" style="--mc:var(--' + m.c + ');--mc-soft:var(--' + m.c + '-soft)"><div class="meal-h"><span class="emo" aria-hidden="true">' + m.e + '</span>' +
+      '<div class="grow"><div class="t">' + m.n + '</div><div class="k">' + info + '</div></div>' +
+      '<div class="kc"><b>' + n0(sums[i]) + '</b><span>ккал</span></div>' +
       '<button class="add" data-act="add-food" data-m="' + m.k + '" aria-label="Добавить: ' + m.n + '">' + ic('plus') + '</button></div>' +
       (list.length ? '<div class="mbar"><i style="width:' + clamp(tgt ? sums[i] / tgt * 100 : 0, 0, 100) + '%"></i></div>' : '');
     h += list.map(x => '<button class="row" data-act="edit-meal" data-id="' + x.id + '">' + thumbHtml({ name: x.food_name }, { mealId: x.id, photo: x.photo }) +
@@ -1307,7 +1351,7 @@ function renderDiary() {
 
   const wp = Math.min(100, s.target_water ? d.water_ml / s.target_water * 100 : 0);
   const cups = 8, per = s.target_water / cups, full = d.water_ml / per;
-  h += '<div class="h2">Вода <small>' + Math.round(wp) + '%</small></div><div class="group pad water"><div class="top-r"><div><b>' + n1(d.water_ml / 1000) + '</b> <span class="mut">из ' + n1(s.target_water / 1000) + ' л</span></div></div>' +
+  h += '<div class="h2">Вода <small>' + Math.round(wp) + '%</small></div><div class="group pad water rise" data-anim="water"><div class="top-r"><div><b>' + n1(d.water_ml / 1000) + '</b> <span class="mut">из ' + n1(s.target_water / 1000) + ' л</span></div></div>' +
     '<div class="cups" aria-hidden="true">' + Array.from({ length: cups }, (_, i) => '<i class="' + (full >= i + 1 ? 'on' : (full > i + 0.25 ? 'half' : '')) + '"></i>').join('') + '</div>' +
     '<div class="bar"><i style="width:' + wp + '%"></i></div>' +
     '<div class="btns"><button class="btn sec sm" data-act="water" data-v="-' + s.water_glass + '">' + ic('minus') + s.water_glass + ' мл</button>' +
@@ -1340,8 +1384,9 @@ function pickerSource() {
     if (pk.remoteQ === q) pk.remote.forEach(x => { const k = norm(x.name) + '|' + norm(x.brand); if (!seen.has(k) && !seen.has(norm(x.name))) { seen.add(k); list.push(x); } });
   } else if (pk.tab === 'recent') list = recent;
   else if (pk.tab === 'mine') list = mine;
-  else if (pk.tab === 'rest') list = pk.chain ? pk.chainItems : [];
-  else list = base.filter(x => pk.cat === 'all' || x.cat === pk.cat);
+  else if (pk.cat === 'cafe') list = CAFE.items.filter(x => !pk.chain || x.brand === pk.chain);
+  else if (pk.cat === 'all') list = base.concat(CAFE.items);
+  else list = base.filter(x => x.cat === pk.cat);
   return list;
 }
 function pickerList() {
@@ -1349,11 +1394,11 @@ function pickerList() {
   if (!list.length) {
     let msg;
     if (pk.q) msg = pk.loading ? 'Ищем в общей базе…' : 'Ничего не найдено. Добавьте продукт вручную.';
-    else if (pk.tab === 'rest') msg = pk.loading ? 'Загружаем меню…' : (pk.chain ? 'В меню пока нет позиций.' : 'Выберите ресторан.');
+    else if (pk.tab === 'base' && pk.cat === 'cafe') msg = CAFE.loaded ? 'В меню этой сети пока нет позиций.' : 'Загружаем меню кафе…';
     else msg = pk.tab === 'recent' ? 'Здесь появятся продукты, которые вы уже добавляли.' : 'Своих рецептов пока нет. Их можно создать на вкладке «Меню».';
     return '<div class="empty">' + msg + '</div>';
   }
-  const limit = pk.tab === 'rest' && !pk.q ? 300 : 120;
+  const limit = pk.tab === 'base' && !pk.q && (pk.cat === 'cafe' || pk.cat === 'all') ? 800 : 120;
   return list.slice(0, limit).map((x, i) => '<button class="row thumbed" data-act="pick" data-i="' + i + '">' + thumbHtml(x) + '<div class="grow"><div class="ttl">' + esc(x.name) + '</div>' +
     (x.brand ? '<div class="sub">' + esc(x.brand) + (x.portions && x.portions.length > 1 ? ' · ' + x.portions.length + ' порции' : (x.src === 'restaurant' && x.g ? ' · ' + n0(x.g) + ' г' : '')) + '</div>' : '') +
     '<div class="sub i2"><span>' + n0(x.cal) + ' ккал</span>' + macLine(x.p, x.f, x.c) + '</div></div>' + ic('chev-r', 'chev') + '</button>').join('') +
@@ -1380,6 +1425,15 @@ function searchRemote() {
     S.picker.remote = items.map(fromServer); S.picker.remoteQ = q; S.picker.loading = false;
     refreshPicker();
   }, 350);
+}
+const CAFE = { items: [], loaded: false, loading: false };
+async function loadCafe() {
+  if (CAFE.loaded || CAFE.loading) return;
+  CAFE.loading = true;
+  try { CAFE.items = ((await api('/api/foods_catalog')).items || []).map(x => Object.assign(fromServer(x), { cat: 'cafe' })); CAFE.loaded = true; }
+  catch (e) { toast(e.message, true); }
+  CAFE.loading = false;
+  if (S.picker) refreshPicker();
 }
 async function openChain(name) {
   const pk = S.picker; pk.chain = name; pk.chainItems = []; pk.loading = true; refreshPicker();
@@ -1411,10 +1465,16 @@ function pickerHtml() {
 function pickerTabs() {
   const pk = S.picker;
   if (pk.q) return '';
-  let h = '<div class="seg" style="margin-bottom:10px">' + [['recent', 'Недавние'], ['base', 'Каталог'], ['rest', 'Рестораны'], ['mine', 'Мои']].map(t => '<button class="' + (pk.tab === t[0] ? 'on' : '') + '" data-act="pk-tab" data-t="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
-  if (pk.tab === 'base') h += '<div class="chips" style="margin-bottom:10px">' + CATS.map(c => '<button class="chip' + (pk.cat === c[0] ? ' on' : '') + '" data-act="pk-cat" data-c="' + c[0] + '">' + c[1] + '</button>').join('') + '</div>';
-  if (pk.tab === 'rest') h += '<div class="chips" style="margin-bottom:10px">' + (pk.chains || []).map(c => '<button class="chip' + (pk.chain === c.name ? ' on' : '') + '" data-act="pk-chain" data-c="' + esc(c.name) + '">' + esc(c.name) + '</button>').join('') + '</div>' +
-    '<p class="note" style="margin:0 2px 10px">Или найдите блюдо поиском: «биг хит», «кфс стрипсы».</p>';
+  let h = '<div class="seg" style="margin-bottom:10px">' + [['recent', 'Недавние'], ['base', 'Каталог'], ['mine', 'Мои']].map(t => '<button class="' + (pk.tab === t[0] ? 'on' : '') + '" data-act="pk-tab" data-t="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+  if (pk.tab === 'base') {
+    h += '<div class="chips" style="margin-bottom:10px">' + CATS.map(c => '<button class="chip' + (pk.cat === c[0] ? ' on' : '') + '" data-act="pk-cat" data-c="' + c[0] + '">' + c[1] + '</button>').join('') + '</div>';
+    if (pk.cat === 'cafe') {
+      const chains = [...new Set(CAFE.items.map(x => x.brand))].sort((a, b) => a.localeCompare(b, 'ru'));
+      h += '<div class="chips" style="margin-bottom:10px">' + [['', 'Все сети']].concat(chains.map(c => [c, c])).map(c =>
+        '<button class="chip sm' + ((pk.chain || '') === c[0] ? ' on' : '') + '" data-act="pk-chain" data-c="' + esc(c[0]) + '">' + esc(c[1]) + '</button>').join('') + '</div>';
+      if (!CAFE.loaded) h += '<p class="note" style="margin:0 2px 10px">Загружаем меню кафе…</p>';
+    }
+  }
   return h;
 }
 function refreshPicker() {
@@ -1427,6 +1487,7 @@ function openPicker(meal, replaceId) {
   const hasRecent = S.d.recent.length > 0;
   S.picker = { meal, replace: replaceId || 0, tab: (hasRecent && !replaceId) ? 'recent' : 'base', cat: 'all', q: '', sel: null, g: 100, manual: false,
     remote: [], remoteQ: '', loading: false, chains: null, chain: '', chainItems: [] };
+  loadCafe();
   openSheet(replaceId ? 'Заменить продукт' : mealOf(meal).n, pickerHtml());
 }
 function amountHtml() {
@@ -1977,7 +2038,7 @@ function renderTop() {
       '<label class="datelabel">' + esc(dateLabel(S.date)) + '<input type="date" data-ch="dateSel" value="' + S.date + '" aria-label="Выбрать дату"></label>' +
       '<button class="nav" data-act="date-next" aria-label="Следующий день">' + ic('chev-r') + '</button></div>';
   } else mid = '<div class="top-title">' + (S.page ? '' : (TITLES[S.tab] || '')) + '</div>';
-  $('#top').innerHTML = '<div class="wrap"><div class="streak" title="Дней подряд с записями">' + ic('flame') + d.streak + '</div>' + mid +
+  $('#top').innerHTML = '<div class="wrap"><div class="streak' + (d.streak > 0 ? ' live' : '') + '" title="Дней подряд с записями">' + ic('flame') + d.streak + '</div>' + mid +
     '<button class="avatar" data-act="tab" data-t="me" aria-label="Профиль">' + initial + (tgUser && tgUser.photo_url ? '<img src="' + esc(tgUser.photo_url) + '" alt="" onerror="this.remove()">' : '') + '</button></div>';
 }
 function renderTabbar() {
@@ -2007,7 +2068,7 @@ function render() {
   v.innerHTML = '<div class="wrap">' + h + '</div>';
   if (S.page === 'goals') updGfPreview();
   if (S.tab === 'diary' || S.tab === 'plan') { /* график не нужен */ } else requestAnimationFrame(drawCharts);
-  if (S.tab === 'diary' && !S.page) loadPhotos();
+  if (S.tab === 'diary' && !S.page) { loadPhotos(); animateDiary(); }
   if (S.d.settings.consent !== '1') { if (!S.consentOn) showConsent(); }
   else if (S.d.settings.onboarded !== '1' && !S.wiz) wizStart();
 }
@@ -2061,9 +2122,9 @@ async function act(a, t, ev) {
     /* дневник */
     case 'add-food': openPicker(D.m); break;
     case 'edit-meal': openEdit(+D.id); break;
-    case 'pk-tab': S.picker.tab = D.t; refreshPicker(); if (D.t === 'rest') loadChains(); break;
-    case 'pk-chain': openChain(D.c); break;
-    case 'pk-cat': S.picker.cat = D.c; refreshPicker(); break;
+    case 'pk-tab': S.picker.tab = D.t; refreshPicker(); if (D.t === 'base') loadCafe(); break;
+    case 'pk-chain': S.picker.chain = D.c; refreshPicker(); break;
+    case 'pk-cat': S.picker.cat = D.c; S.picker.chain = ''; refreshPicker(); if (D.c === 'cafe' || D.c === 'all') loadCafe(); break;
     case 'pick': {
       const it = pickerSource()[+D.i]; if (!it) break;
       if (S.picker.replace) {
@@ -2340,10 +2401,11 @@ def generate_day(cur, user_id, date):
     target_cal = settings["target_cal"]
     excluded = settings["excluded"]
 
-    filtered_foods = [f for f in DEFAULT_FOODS if f[5] not in excluded]
+    filtered_foods = [f for f in DEFAULT_FOODS if not (menu_data.tags(f) & set(excluded))]
     if not filtered_foods:
         filtered_foods = DEFAULT_FOODS
     food_map = {f[0]: f for f in filtered_foods}
+    full_map = {f[0]: f for f in DEFAULT_FOODS}
 
     cur.execute(
         "SELECT name, calories, protein, fat, carbs, COALESCE(meal_type, 'none') FROM custom_foods WHERE telegram_id = %s",
@@ -2376,22 +2438,9 @@ def generate_day(cur, user_id, date):
                             round(side[2] * sfac, 1), round(side[3] * sfac, 1), round(side[4] * sfac, 1))
             continue
 
-        valid_templates = [
-            tpl for tpl in MEAL_TEMPLATES[m_type]
-            if all(item[0] in food_map for item in tpl)
-        ]
-        if not valid_templates:
-            valid_templates = MEAL_TEMPLATES[m_type]
-
-        chosen_combo = random.choice(valid_templates)
-        for f_name, item_share in chosen_combo:
-            if f_name not in food_map:
-                f_name = random.choice(list(food_map.keys()))
-            _, cal100, p100, f100, c100, _ = food_map[f_name]
-            grams = max(round((budget * item_share / cal100) * 100 / 10) * 10, 40)
-            fac = grams / 100.0
-            insert_meal(cur, user_id, date, m_type, f_name, grams, round(cal100 * fac, 1),
-                        round(p100 * fac, 1), round(f100 * fac, 1), round(c100 * fac, 1))
+        # Сочетание из библиотеки menu_data: порции в реалистичных границах, калории добираются гарниром
+        for f_name, grams, cal, p, f, c in menu_data.build_meal(m_type, budget, full_map, excluded):
+            insert_meal(cur, user_id, date, m_type, f_name, grams, cal, p, f, c)
     sync_daily_calories(cur, user_id, date)
 
 
@@ -2726,7 +2775,7 @@ DB_UNAVAILABLE = (psycopg.OperationalError, PoolTimeout)
 BAD_INPUT = (KeyError, ValueError, TypeError, IndexError, psycopg.DataError)
 
 GET_PATHS = ("/api/state", "/api/export_backup", "/api/exercise_history", "/api/foods_search",
-             "/api/foods_chains", "/api/admin_stats", "/api/meal_photo")
+             "/api/foods_chains", "/api/admin_stats", "/api/meal_photo", "/api/foods_catalog")
 
 
 def notify_admin(user_id, kind, text):
@@ -2832,6 +2881,8 @@ class GrammikaAppHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"items": food_db.search(POOL, q, brand)})
             elif path == "/api/foods_chains":
                 self._send_json({"items": food_db.chains(POOL)})
+            elif path == "/api/foods_catalog":
+                self._send_json({"items": food_db.catalog(POOL)})
             elif path == "/api/admin_stats":
                 if not extras.is_admin(user_id):
                     self._send_json({"error": "not found"}, 404)

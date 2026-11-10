@@ -443,7 +443,8 @@ def _local(pool, words, brand, limit):
 
 
 PORTION_TAIL = re.compile(
-    r"\s+(\d+\s*шт\.?|\d+[.,]?\d*\s*л|маленьк\w*|средн\w*|больш\w*|мал(ый|ые|ая)|баскет)$", re.I)
+    r"\s+(двойная порция|стандарт|\d+\s*шт\.?|\d+[.,]?\d*\s*(л|литр)(\s+в\s+бутылке)?|маленьк\w*|средн\w*|больш\w*"
+    r"|мал(ый|ые|ая)|баскет)$", re.I)
 
 
 def _base_name(name):
@@ -502,6 +503,18 @@ def search(pool, q="", brand=None, limit=40):
         if _fetch_off_if_needed(pool, text):
             items = _local(pool, words, brand, limit * 3)
     return items[:limit]
+
+
+def catalog(pool):
+    """Все блюда сетей для раздела «Кафе» в каталоге."""
+    with pool.connection() as conn:
+        rows = conn.execute(
+            "SELECT name, brand, kcal, protein, fat, carbs, serving_g, serving_name, source, image_url "
+            "FROM foods WHERE source = 'restaurant' AND status = 'approved' ORDER BY brand, name, serving_g"
+        ).fetchall()
+    items = [{"name": r[0], "brand": r[1], "cal": r[2], "p": r[3] or 0, "f": r[4] or 0, "c": r[5] or 0,
+              "g": round(r[6]) if r[6] else 100, "portion": r[7], "src": r[8], "img": r[9]} for r in rows]
+    return tidy(items)
 
 
 def chains(pool):
